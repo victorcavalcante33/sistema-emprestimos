@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Editar Empréstimo</title>
+</head>
+<body>
+    {% extends 'base.html' %}
+    
+    {% block content %}
+        <h2>Editar Empréstimo</h2>
+        <form method="post">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <button type="submit">Salvar Alterações</button>
+            <a href="{% url 'PELFCRED:lista_emprestimos' %}">
+            <button type="button">Cancelar</button></a>
+        </form>
+    {% endblock %}
+</body>
+</html>

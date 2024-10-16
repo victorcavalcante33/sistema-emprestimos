@@ -1,0 +1,87 @@
+/* Estilos básicos */
+body, html {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    font-family: Arial, sans-serif;
+}
+
+/* Responsividade para a tabela */
+.table-responsive {
+    overflow-x: auto;
+    max-width: 100%;
+}
+
+.table thead th, .table tbody td {
+    text-align: center;
+    white-space: nowrap; /* Evita quebra de texto nas células */
+}
+
+.table {
+    width: 100%;
+}
+
+@media (max-width: 768px) {
+    .table thead th, .table tbody td {
+        font-size: 0.8rem; /* Diminui o tamanho da fonte em telas pequenas */
+    }
+}
+
+/* Ajustes de responsividade para botões */
+.btn-sm {
+    padding: 0.2rem 0.4rem; /* Reduzindo o espaçamento interno */
+    font-size: 0.75rem; /* Reduzindo o tamanho da fonte dos botões */
+    margin-bottom: 5px; /* Espaçamento inferior entre os botões */
+}
+
+.d-grid {
+    gap: 5px; /* Espaçamento entre os botões nas ações */
+}
+
+@media (max-width: 768px) {
+    .btn-sm {
+        font-size: 0.7rem; /* Fonte ainda menor em telas bem pequenas */
+        padding: 0.1rem 0.3rem;
+    }
+}
+
+/* Ajuste para colunas da tabela se comportarem melhor em telas menores */
+@media (max-width: 768px) {
+    .table thead th, .table tbody td {
+        padding: 0.3rem; /* Reduz o espaçamento interno das células */
+    }
+}
+
+/* Estilo para o modal em telas menores */
+.modal-dialog {
+    max-width: 100%; /* Faz o modal ocupar toda a tela em dispositivos menores */
+}
+
+.modal-content {
+    padding: 1rem;
+}
+
+/* Ajustes gerais para botões */
+.btn {
+    transition: background-color 0.3s ease;
+}
+
+.btn:hover {
+    background-color: #0056b3; /* Mudança de cor ao passar o mouse */
+}
+
+
+
+.status-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 5px;
+}
+.status-dot-active {
+    background-color: #28a745;
+}
+.status-dot-inactive {
+    background-color: #dc3545;
+}

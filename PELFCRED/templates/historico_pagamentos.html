@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+{% load custom_filters %}
+
+{% block title %}Histórico de Pagamentos{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2 class="mb-2 text-primary">Histórico de Pagamentos</h2>
+    <h3 class="mb-3 text-secondary">Contrato: {{ emprestimo.id }}</h3>
+    
+    <p class="mb-2">Total de Pagamentos: <span class="badge bg-info">{{ pagamentos|length }}</span></p>
+    
+    <div class="d-flex mb-3">
+        <button type="button" class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#filterModal">
+            Filtros e Busca
+        </button>
+        <div class="dropdown">
+            <button class="btn btn-secondary dropdown-toggle" type="button" id="exportDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                Exportar
+            </button>
+            <ul class="dropdown-menu" aria-labelledby="exportDropdown">
+                <li><a class="dropdown-item" href="#">CSV</a></li>
+                <li><a class="dropdown-item" href="#">PDF</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Modal para Filtros e Busca -->
+    <div class="modal fade" id="filterModal" tabindex="-1" aria-labelledby="filterModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="filterModalLabel">Filtros e Busca</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form method="get" id="filterForm">
+                        <div class="mb-2">
+                            <label for="data_inicio" class="form-label">Data Início:</label>
+                            <input type="date" class="form-control" id="data_inicio" name="data_inicio" value="{{ request.GET.data_inicio }}">
+                        </div>
+                        <div class="mb-2">
+                            <label for="data_fim" class="form-label">Data Fim:</label>
+                            <input type="date" class="form-control" id="data_fim" name="data_fim" value="{{ request.GET.data_fim }}">
+                        </div>
+                        <div class="mb-2">
+                            <label for="valor_minimo" class="form-label">Valor Mínimo:</label>
+                            <input type="number" class="form-control" id="valor_minimo" name="valor_minimo" step="0.01" value="{{ request.GET.valor_minimo }}">
+                        </div>
+                        <div class="mb-2">
+                            <label for="valor_maximo" class="form-label">Valor Máximo:</label>
+                            <input type="number" class="form-control" id="valor_maximo" name="valor_maximo" step="0.01" value="{{ request.GET.valor_maximo }}">
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <button type="submit" class="btn btn-primary btn-sm">Aplicar</button>
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="limparFiltros()">Limpar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="table-responsive">
+        <table class="table table-striped table-hover table-sm">
+            <thead class="table-light">
+                <tr>
+                    <th>Data de Pagamento</th>
+                    <th>Valor Pago</th>
+                    <th>Data de Renovaçao</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if pagamentos %}
+                    {% for pagamento in pagamentos %}
+                    <tr>
+                        <td>{{ pagamento.data_pagamento|date:"d/m/Y H:i" }}</td>
+                        <td>{{ pagamento.valor_pago|floatformat:2 }}</td>
+                        <td>{{ emprestimo.data_renovacao|date:"d/m/Y H:i" }}</td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="3" class="text-center">Nenhum pagamento encontrado.</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<style>
+    .table-responsive {
+        margin-top: 20px;
+    }
+    .badge {
+        font-size: 0.9em;
+    }
+    .card {
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    }
+</style>
+
+<script>
+    function limparFiltros() {
+        var form = document.getElementById('filterForm');
+        var inputs = form.getElementsByTagName('input');
+        
+        for (var i = 0; i < inputs.length; i++) {
+            if (inputs[i].type === 'date' || inputs[i].type === 'number') {
+                inputs[i].value = '';
+            }
+        }
+        
+        form.submit();
+    }
+</script>
+{% endblock %}

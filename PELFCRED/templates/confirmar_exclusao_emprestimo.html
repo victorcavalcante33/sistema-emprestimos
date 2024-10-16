@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+
+{% block title %}Confirmar Exclusão de Empréstimo{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card mt-5">
+                <div class="card-body">
+                    <h2 class="card-title text-center mb-4">Confirmar Exclusão</h2>
+                    <p class="text-center">Tem certeza que deseja excluir o Contrato de {{ emprestimo.cliente.nome }}?</p>
+                    <form method="post" class="d-flex justify-content-center">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger me-2">Confirmar Exclusão</button>
+                        <a href="{% url 'PELFCRED:lista_emprestimos' %}" class="btn btn-secondary">Cancelar</a>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
