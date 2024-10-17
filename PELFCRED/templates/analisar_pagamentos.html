@@ -96,14 +96,14 @@
                     <th>Saldo</th>
                     <th>Grupo</th>
                     <th>Usuário</th>
-                    <th>ID Empréstimo</th>
+                    <th>Contrato</th>
                     {% if is_admin %}<th></th>{% endif %}
                 </tr>
             </thead>
             <tbody >
                 {% for pagamento in pagamentos %}
                 <tr>
-                    <td class="align-middle text-center">{{ pagamento.emprestimo.cliente.apelido }}</td>
+                    <td class="align-middle text-center">{{ pagamento.emprestimo.cliente.apelido }}<div class="small">{{ pagamento.emprestimo.cliente.nome }}</div></td>
                     <td class="align-middle text-center">{{ pagamento.data_pagamento|date:"d/m/Y" }}</td>
                     <td class="small align-middle text-center {% if pagamento.valor_pago > 0 %}valor-pago{% elif pagamento.valor_pago < 0 %}valor-negativo{% endif %}">{{ pagamento.valor_pago|floatformat:0|default:"" }}</td>
                     <td class="align-middle text-center">{{ pagamento.tipo_pagamento }}</td>

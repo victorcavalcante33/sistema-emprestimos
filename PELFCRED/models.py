@@ -16,8 +16,8 @@ class Cliente(models.Model):
             'unique': "Cpf já cadastrado."
         }
     )
-    nome = models.CharField(max_length=100)  # Nome completo
-    apelido = models.CharField(max_length=50)  # Apelido
+    nome = models.CharField(max_length=100, null=True, blank=True)  # Nome completo
+    apelido = models.CharField(max_length=50, null=True, blank=True)  # Apelido
     documento = models.CharField(max_length=20, null=True, blank=True)  # Documento (opcional)
     cnpj = models.CharField(max_length=14, null=True, blank=True)  # CNPJ (opcional)
     telefone = models.CharField(max_length=11, null=True, blank=True)  # Telefone (opcional)

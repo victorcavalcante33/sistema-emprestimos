@@ -7,7 +7,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Configurações de segurança
 SECRET_KEY = "django-inseguro-27g&wn&vru!2==ms!=1c2kjycjl^*l(bns0(@*&km0yij*-q6k"
-DEBUG = False
+DEBUG = True
 ALLOWED_HOSTS = ['localhost', '127.0.0.1', '192.168.0.23:8000', '192.168.0.23', 'vito9621.pythonanywhere.com']
 
 # Aplicações instaladas

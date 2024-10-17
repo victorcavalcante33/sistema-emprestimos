@@ -1018,8 +1018,8 @@ def analisar_pagamentos(request):
         pagamentos = Pagamento.objects.filter(usuario=request.user)  # Usuário comum vê apenas seus pagamentos
     
     # Calcular os totais de PIX e Dinheiro
-    total_pix = pagamentos.filter(tipo_pagamento='pix').aggregate(Sum('valor_pago'))['valor_pago__sum'] or 0
-    total_dinheiro = pagamentos.filter(tipo_pagamento='dinheiro').aggregate(Sum('valor_pago'))['valor_pago__sum'] or 0
+    total_pix = pagamentos.filter(tipo_pagamento='PIX').aggregate(Sum('valor_pago'))['valor_pago__sum'] or 0
+    total_dinheiro = pagamentos.filter(tipo_pagamento='DINHEIRO').aggregate(Sum('valor_pago'))['valor_pago__sum'] or 0
         # Calcular o total de pagamentos filtrados
     total_pagamentos = pagamentos.aggregate(total=Sum('valor_pago'))['total'] or 0
     
@@ -1132,9 +1132,9 @@ def registrar_pagamento(request, id_emprestimo=None):
         tipo_pagamento = request.POST.get('tipo_pagamento')
 
         # Verifica o tipo de pagamento e atualiza o campo correspondente
-        if tipo_pagamento == 'dinheiro':
+        if tipo_pagamento == 'DINHEIRO':
             emprestimo.total_recebido_dinheiro += valor_pago
-        elif tipo_pagamento == 'pix':
+        elif tipo_pagamento == 'PIX':
             emprestimo.total_recebido += valor_pago
         
         # Certifique-se de que o valor pago é maior que 0
@@ -1327,11 +1327,11 @@ def totais(request):
 
     # Calcular os totais de pagamentos usando o conjunto base de pagamentos
     total_pix = pagamentos_base.aggregate(
-        total_pix=Sum('valor_pago', filter=Q(tipo_pagamento__iexact='pix'))
+        total_pix=Sum('valor_pago', filter=Q(tipo_pagamento__iexact='PIX'))
     )['total_pix'] or Decimal(0)
 
     total_dinheiro = pagamentos_base.aggregate(
-        total_dinheiro=Sum('valor_pago', filter=Q(tipo_pagamento__iexact='dinheiro'))
+        total_dinheiro=Sum('valor_pago', filter=Q(tipo_pagamento__iexact='DINHEIRO'))
     )['total_dinheiro'] or Decimal(0)
 
     # Calcular o total geral de pagamentos
