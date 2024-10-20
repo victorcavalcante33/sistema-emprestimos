@@ -114,10 +114,10 @@ class Emprestimo(models.Model):
     
     STATUS_CHOICES = [
         ('ativo', 'Ativo'),
-        ('R', 'Renovado'),
-        ('NG', 'Negociado'),
-        ('finalizado', 'Finalizado'),
-        ('inadimplentes', 'Inadimplentes'),
+        ('R', 'R'),
+        ('NG', 'NG'),
+        ('finalizado', 'AC'),
+        ('inadimplentes', 'Inadimplente'),
     ]
 
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='ativo')

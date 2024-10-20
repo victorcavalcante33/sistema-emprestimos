@@ -1,9 +1,11 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load custom_filters %}
 
 {% block title %}Editar Cliente{% endblock %}
 
 {% block content %}
+<link rel="icon" type="image/x-icon" href="{% static 'PELFCRED\favicon/favicon.ico' %}">
 <body class='bg-light'>
     <div class="row justify-content-center">
         <div class="col-md-1 col-lg-7">
@@ -12,92 +14,86 @@
                     <h4 class="mb-1 text-primary text-center">Editar Cliente</h4>
                     <form method="post" class="mb-1">
                         {% csrf_token %}
-                        <div class="row g-2">
-                            <div class="col-12 col-md-4">
+                        <div class="row">
+                            <!-- Campo Nome -->
+                            <div class="col-12 col-md-6">
                                 <div class="form-group">
-                                    {{ form.nome.label_tag }}
-                                    {{ form.nome }}
+                                    <input type="text" name="{{ form.nome.name }}" id="{{ form.nome.auto_id }}" class="form-control{% if form.nome.errors %} is-invalid{% endif %}" value="{{ form.nome.value|default_if_none:'' }}" placeholder='Nome'>
                                     {% if form.nome.errors %}
-                                    <div class="error-message">{{ form.nome.errors }}</div>
+                                    <div class="error-message text-danger">{{ form.nome.errors }}</div>
                                     {% endif %}
                                 </div>
                             </div>
-                            <div class="col-12 col-md-4">
+                            <!-- Campo Apelido -->
+                            <div class="col-12 col-md-6">
                                 <div class="form-group">
-                                    {{ form.apelido.label_tag }}
-                                    {{ form.apelido }}
+                                    <input type="text" name="{{ form.apelido.name }}" id="{{ form.apelido.auto_id }}" class="form-control{% if form.apelido.errors %} is-invalid{% endif %}" value="{{ form.apelido.value|default_if_none:'' }}" placeholder="Apelido">
                                     {% if form.apelido.errors %}
-                                    <div class="error-message">{{ form.apelido.errors }}</div>
+                                    <div class="error-message text-danger">{{ form.apelido.errors }}</div>
                                     {% endif %}
                                 </div>
                             </div>
-                            <div class="col-12 col-md-4">
+                            <!-- Campo CPF -->
+                            <div class="col-12 col-md-6">
                                 <div class="form-group">
-                                    {{ form.cpf.label_tag }}
-                                    <input type="text" name="cpf" value="{{ form.cpf.value }}" readonly>
+                                    <input type="text" name="{{ form.cpf.name }}" id="{{ form.cpf.auto_id }}" class="form-control{% if form.cpf.errors %} is-invalid{% endif %}" maxlength="11" value="{{ form.cpf.value|default_if_none:'' }}" oninput="this.value = this.value.replace(/[^0-9]/g, '')" placeholder="CPF" readonly>
                                     {% if form.cpf.errors %}
-                                    <div class="error-message">{{ form.cpf.errors }}</div>
+                                    <div class="error-message text-danger">{{ form.cpf.errors }}</div>
                                     {% endif %}
                                 </div>
                             </div>
-                            <div class="col-12 col-md-4">
+                            <!-- Campo CNPJ -->
+                            <div class="col-12 col-md-6">
                                 <div class="form-group">
-                                    {{ form.cnpj.label_tag }}
-                                    {{ form.cnpj }}
+                                    <input type="text" name="{{ form.cnpj.name }}" id="{{ form.cnpj.auto_id }}" class="form-control{% if form.cnpj.errors %} is-invalid{% endif %}" maxlength="14" value="{{ form.cnpj.value|default_if_none:'' }}" oninput="this.value = this.value.replace(/[^0-9]/g, '')" placeholder="CNPJ">
                                     {% if form.cnpj.errors %}
                                     <div class="error-message">{{ form.cnpj.errors }}</div>
                                     {% endif %}
                                 </div>
                             </div>
-                            <div class="col-12 col-md-4">
+                            <div class="col-12 col-md-6">
                                 <div class="form-group">
-                                    {{ form.documento.label_tag }}
-                                    {{ form.documento }}
+                                    <input type="text" class="form-control" name="{{ form.documento.name }}" id="{{ form.documento.auto_id }}" value="{{ form.documento.value|default_if_none:'' }}" oninput="this.value = this.value.replace(/[^0-9]/g, '')" placeholder="Documento">
                                     {% if form.documento.errors %}
                                     <div class="error-message">{{ form.documento.errors }}</div>
                                     {% endif %}
                                 </div>
                             </div>
-                            <div class="col-12 col-md-4">
+                            <div class="col-12 col-md-6">
                                 <div class="form-group">
-                                    {{ form.email.label_tag }}
-                                    {{ form.email }}
+                                     <input type="text" class="form-control" placeholder="Email" name="{{ form.email.name }}" id="{{ form.email.auto_id }}" value="{{ form.email.value|default_if_none:'' }}">
                                     {% if form.email.errors %}
                                     <div class="error-message">{{ form.email.errors }}</div>
                                     {% endif %}
                                 </div>
                             </div>
-                            <div class="col-12 col-md-3">
+                            <div class="col-12 col-md-6">
                                 <div class="form-group">
-                                    {{ form.telefone.label_tag }}
-                                    {{ form.telefone }}
+                                     <input type="text" class="form-control" placeholder="Telefone" name="{{ form.telefone.name }}" id="{{ form.telefone.auto_id }}" maxlength="11" value="{{ form.telefone.value|default_if_none:'' }}">
                                     {% if form.telefone.errors %}
                                     <div class="error-message">{{ form.telefone.errors }}</div>
                                     {% endif %}
                                 </div>
                             </div>
-                            <div class="col-12 col-md-3">
+                            <div class="col-12 col-md-6">
                                 <div class="form-group">
-                                    {{ form.telefone2.label_tag }}
-                                    {{ form.telefone2 }}
+                                     <input type="text" class="form-control" placeholder="Telefone 2" name="{{ form.telefone2.name }}" id="{{ form.telefone2.auto_id }}" maxlength="11" value="{{ form.telefone2.value|default_if_none:'' }}">
                                     {% if form.telefone2.errors %}
                                     <div class="error-message">{{ form.telefone2.errors }}</div>
                                     {% endif %}
                                 </div>
                             </div>
-                            <div class="col-12 col-md-3">
+                            <div class="col-12 col-md-6">
                                 <div class="form-group">
-                                    {{ form.vinculo_telefone2.label_tag }}
-                                    {{ form.vinculo_telefone2 }}
+                                     <input type="text" class="form-control" placeholder="Vinculo" name="{{ form.vinculo_telefone2.name }}" id="{{ form.vinculo_telefone2.auto_id }}" value="{{ form.vinculo_telefone2.value|default_if_none:'' }}">
                                     {% if form.vinculo_telefone2.errors %}
                                     <div class="error-message">{{ form.vinculo_telefone2.errors }}</div>
                                     {% endif %}
                                 </div>
                             </div>
-                            <div class="col-12 col-md-3">
+                            <div class="col-12 col-md-6">
                                 <div class="form-group">
-                                    {{ form.cep.label_tag }}
-                                    {{ form.cep }}
+                                     <input type="text" class="form-control" placeholder="CEP" name="{{ form.cep.name }}" id="{{ form.cep.auto_id }}" maxlength="8" value="{{ form.cep.value|default_if_none:'' }}" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
                                     {% if form.cep.errors %}
                                     <div class="error-message">{{ form.cep.errors }}</div>
                                     {% endif %}
@@ -105,65 +101,72 @@
                             </div>
                             <div class="col-12 col-md-6">
                                 <div class="form-group">
-                                    {{ form.endereco.label_tag }}
-                                    {{ form.endereco }}
+                                     <input type="text" class="form-control" placeholder="Endereço" name="{{ form.endereco.name }}" id="{{ form.endereco.auto_id }}" value="{{ form.endereco.value|default_if_none:'' }}">
                                     {% if form.endereco.errors %}
                                     <div class="error-message">{{ form.endereco.errors }}</div>
                                     {% endif %}
                                 </div>
                             </div>
-                            <div class="col-12 col-md-3">
+                            <div class="col-12 col-md-6">
                                 <div class="form-group">
-                                    {{ form.numero_endereco.label_tag }}
-                                    {{ form.numero_endereco }}
+                                     <input type="text" class="form-control" placeholder="Numero" name="{{ form.numero_endereco.name }}" id="{{ form.numero_endereco.auto_id }}" value="{{ form.numero_endereco.value|default_if_none:'' }}">
                                     {% if form.numero_endereco.errors %}
                                     <div class="error-message">{{ form.numero_endereco.errors }}</div>
                                     {% endif %}
                                 </div>
                             </div>
-                            <div class="col-12 col-md-3">
+                            <div class="col-12 col-md-6">
                                 <div class="form-group">
-                                    {{ form.uf.label_tag }}
-                                    {{ form.uf }}
+                                     <input type="text" class="form-control" placeholder="UF" name="{{ form.uf.name }}" id="{{ form.uf.auto_id }}" value="{{ form.uf.value|default_if_none:'' }}">
                                     {% if form.uf.errors %}
                                     <div class="error-message">{{ form.uf.errors }}</div>
                                     {% endif %}
                                 </div>
                             </div>
-                            <div class="col-12 col-md-4">
+                            <div class="col-12 col-md-6">
                                 <div class="form-group">
-                                    {{ form.cidade.label_tag }}
-                                    {{ form.cidade }}
+                                     <input type="text" class="form-control" placeholder="Cidade" name="{{ form.cidade.name }}" id="{{ form.cidade.auto_id }}" value="{{ form.cidade.value|default_if_none:'' }}">
                                     {% if form.cidade.errors %}
                                     <div class="error-message">{{ form.cidade.errors }}</div>
                                     {% endif %}
                                 </div>
                             </div>
-                            <div class="col-12 col-md-4">
+                            <div class="col-12 col-md-6">
                                 <div class="form-group">
-                                    {{ form.bairro.label_tag }}
-                                    {{ form.bairro }}
+                                     <input type="text" class="form-control" placeholder="Bairro" name="{{ form.bairro.name }}" id="{{ form.bairro.auto_id }}" value="{{ form.bairro.value|default_if_none:'' }}">
                                     {% if form.bairro.errors %}
                                     <div class="error-message">{{ form.bairro.errors }}</div>
                                     {% endif %}
                                 </div>
                             </div>
-                            <div class="col-12 col-md-4">
+                            <div class="col-12 col-md-6">
                                 <div class="form-group">
-                                    {{ form.complemento.label_tag }}
-                                    {{ form.complemento }}
+                                     <input type="text" class="form-control" placeholder="Complemento" name="{{ form.complemento.name }}" id="{{ form.complemento.auto_id }}" value="{{ form.complemento.value|default_if_none:'' }}">
                                     {% if form.complemento.errors %}
                                     <div class="error-message">{{ form.complemento.errors }}</div>
                                     {% endif %}
                                 </div>
                             </div>
-                            <div class="col-12 col-md-4">
-                                <div class="form-group">
-                                    {{ form.grupo.label_tag }}
-                                    {{ form.grupo }}
-                                    {% if form.grupo.errors %}
-                                    <div class="error-message">{{ form.grupo.errors }}</div>
-                                    {% endif %}
+                            <div class="row">
+                                <!-- Campo Usuário (somente admins podem ver) -->
+                                <div class="col-12 col-md-6">
+                                    <div class="form-group">
+                                        {{ form.usuario.label_tag }}
+                                        {{ form.usuario|add_class:'form-control' }}
+                                        {% if form.usuario.errors %}
+                                        <div class="error-message text-danger">{{ form.usuario.errors }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <!-- Campo Grupo (somente admins podem ver) -->
+                                <div class="col-12 col-md-6">
+                                    <div class="form-group">
+                                        {{ form.grupo.label_tag }}
+                                        {{ form.grupo|add_class:'form-control' }}
+                                        {% if form.grupo.errors %}
+                                        <div class="error-message text-danger">{{ form.grupo.errors }}</div>
+                                        {% endif %}
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -176,38 +179,6 @@
             </div>
         </div>
     </div>
-
-<style>
-    .form-group {
-        margin-bottom: 0.0rem;
-    }
-    .form-group label {
-        font-weight: bold;
-        font-size: 0.55em;
-    }
-    .form-group input,
-    .form-group select {
-        font-size: 0.45em;
-        padding: 0.10rem 0.2rem;
-        height: auto;
-    }
-    .error-message {
-        color: red;
-        font-size: 0.65em;
-        margin-top: 0.2rem;
-    }
-    .alert {
-        padding: 0.75rem 1.25rem;
-        margin-bottom: 1rem;
-        border: 1px solid transparent;
-        border-radius: 0.25rem;
-    }
-    .alert-danger {
-        color: #721c24;
-        background-color: #f8d7da;
-        border-color: #f5c6cb;
-    }
-</style>
 
 <script>
 document.addEventListener("DOMContentLoaded", function() {

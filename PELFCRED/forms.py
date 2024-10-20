@@ -6,6 +6,7 @@ from django import forms
 from django.utils import timezone
 from unidecode import unidecode
 from django.contrib.auth.models import Group, User
+
 class ClienteForm(forms.ModelForm):
     grupo = forms.ModelChoiceField(queryset=Group.objects.all(), required=False)
     usuario = forms.ModelChoiceField(queryset=User.objects.all(), required=False)
@@ -72,19 +73,17 @@ class ClienteForm(forms.ModelForm):
     )
         
     def __init__(self, *args, **kwargs):
-        self.user = kwargs.pop('user')  # Pega o usuário do kwargs
+        self.user = kwargs.pop('user', None)  # Pega o usuário do kwargs, com valor padrão None
         super(ClienteForm, self).__init__(*args, **kwargs)
 
         # Mostra grupo e usuário apenas se o usuário for admin
-        if not self.user.is_superuser:
+        if self.user and not self.user.is_superuser:
             self.fields['grupo'].widget = forms.HiddenInput()
             self.fields['usuario'].widget = forms.HiddenInput()
         
-            # Inicializa o CPF como readonly
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, **kwargs)
-            if self.instance and self.instance.pk:
-             self.fields['cpf'].disabled = True  # Desativa o campo CPF na edição
+        # Inicializa o CPF como readonly
+        if self.instance and self.instance.pk:
+            self.fields['cpf'].disabled = True  # Desativa o campo CPF na edição
 
     # Validação do campo CPF (Apenas na criação)
     def clean_cpf(self):
@@ -97,8 +96,6 @@ class ClienteForm(forms.ModelForm):
             raise forms.ValidationError("CPF Cadastrado")
         return cpf
       
-
-
     # Validação do campo nome
     def clean_nome(self):
         nome = self.cleaned_data.get('nome').strip()
@@ -127,21 +124,21 @@ class ClienteForm(forms.ModelForm):
             raise forms.ValidationError("CNPJ inválido. Deve conter 14 dígitos.")
         return cnpj
 
-def clean_telefone(self):
-     telefone = self.cleaned_data.get('telefone')
-     if telefone:  # Verifica se telefone não é None
-        telefone = re.sub(r'\D', '', telefone)  # Remove todos os caracteres não numéricos
-        if len(telefone) != 10 and len(telefone) != 11:
-            raise forms.ValidationError("Número de telefone inválido. Deve conter 10 ou 11 dígitos.")
-     return telefone  # Retorna o telefone sem formatação para armazenamento
+    def clean_telefone(self):
+         telefone = self.cleaned_data.get('telefone')
+         if telefone:  # Verifica se telefone não é None
+            telefone = re.sub(r'\D', '', telefone)  # Remove todos os caracteres não numéricos
+            if len(telefone) != 10 and len(telefone) != 11:
+                raise forms.ValidationError("Número de telefone inválido. Deve conter 10 ou 11 dígitos.")
+         return telefone  # Retorna o telefone sem formatação para armazenamento
 
-def clean_telefone2(self):
-    telefone2 = self.cleaned_data.get('telefone2')
-    if telefone2:  # Verifica se telefone2 não é None
-        telefone2 = re.sub(r'\D', '', telefone2)  # Remove todos os caracteres não numéricos
-        if len(telefone2) != 10 and len(telefone2) != 11:
-            raise forms.ValidationError("Número de telefone inválido. Deve conter 10 ou 11 dígitos.")
-    return telefone2  # Retorna o telefone sem formatação para armazenamento
+    def clean_telefone2(self):
+        telefone2 = self.cleaned_data.get('telefone2')
+        if telefone2:  # Verifica se telefone2 não é None
+            telefone2 = re.sub(r'\D', '', telefone2)  # Remove todos os caracteres não numéricos
+            if len(telefone2) != 10 and len(telefone2) != 11:
+                raise forms.ValidationError("Número de telefone inválido. Deve conter 10 ou 11 dígitos.")
+        return telefone2  # Retorna o telefone sem formatação para armazenamento
 
 class EmprestimoForm(forms.ModelForm):
     DIAS_DA_SEMANA_CHOICES = [
@@ -258,4 +255,3 @@ class PagamentoForm(forms.ModelForm):
         # Definindo a data de pagamento para a data atual se não estiver definida
             if not self.instance.data_pagamento:
                 self.fields['data_pagamento'].initial = timezone.now().date()
-                

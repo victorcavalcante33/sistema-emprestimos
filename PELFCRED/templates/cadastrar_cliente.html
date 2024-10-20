@@ -69,7 +69,7 @@
                             <div class="col-12 col-md-6">
                                 <div class="form-group">
 
-                                    <input type="text" class="form-control" placeholder="Telefone" name="{{ form.telefone.name }}" id="{{ form.telefone.auto_id }}" value="{{ form.telefone.value|default_if_none:'' }}">
+                                    <input type="text" class="form-control" placeholder="Telefone" name="{{ form.telefone.name }}" id="{{ form.telefone.auto_id }}" maxlength="11" value="{{ form.telefone.value|default_if_none:'' }}">
                                     {% if form.telefone.errors %}
                                     <div class="error-message">{{ form.telefone.errors }}</div>
                                     {% endif %}
@@ -78,7 +78,7 @@
                             <div class="col-12 col-md-6">
                                 <div class="form-group">
 
-                                    <input type="text" class="form-control" placeholder="Telefone 2" name="{{ form.telefone2.name }}" id="{{ form.telefone2.auto_id }}" value="{{ form.telefone2.value|default_if_none:'' }}">
+                                    <input type="text" class="form-control" placeholder="Telefone 2" name="{{ form.telefone2.name }}" id="{{ form.telefone2.auto_id }}" maxlength="11" value="{{ form.telefone2.value|default_if_none:'' }}">
                                     {% if form.telefone2.errors %}
                                     <div class="error-message">{{ form.telefone2.errors }}</div>
                                     {% endif %}

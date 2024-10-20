@@ -50,7 +50,7 @@
                     <li class="nav-item d-flex align-items-center">
                         <div class="user-info me-3">
                             <span><i class="fas fa-user me-1"></i> {{ user.username }}</span>
-                            <span><i class="fas fa-users me-1"></i> {{ user.groups.first }}</span>
+                            <span><i class="fas fa-users me-1"></i> {{ user.groups.first|default:'' }}</span>
                         </div>
                     </li>
                     {% if is_admin %}
@@ -60,7 +60,7 @@
                         </a>
                     </li>
                     {% endif %}
-
+                    
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'PELFCRED:lista_clientes' %}"><i class="fas fa-users me-1"></i> Clientes</a>
                     </li>
@@ -74,6 +74,9 @@
                         <a class="nav-link" href="{% url 'PELFCRED:totais' %}"><i class="fas fa-chart-bar me-1"></i> Totais</a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link" href="{% url 'admin:index' %}"><i class="fas fa-cog me-1"></i></a>
+                    </li>
+                    <li class="nav-item">
                         <form method="post" action="{% url 'logout' %}">
                             {% csrf_token %}
                             <button type="submit" class="btn btn-outline-light"><i class="fas fa-sign-out-alt me-1"></i> Sair</button>
@@ -83,7 +86,6 @@
             </div>
         </div>
     </nav>
-
     <div class="container">
         {% block content %}{% endblock %}
     </div>

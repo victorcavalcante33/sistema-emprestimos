@@ -106,7 +106,7 @@
                     <td class="align-middle text-center">{{ pagamento.emprestimo.cliente.apelido }}<div class="small">{{ pagamento.emprestimo.cliente.nome }}</div></td>
                     <td class="align-middle text-center">{{ pagamento.data_pagamento|date:"d/m/Y" }}</td>
                     <td class="small align-middle text-center {% if pagamento.valor_pago > 0 %}valor-pago{% elif pagamento.valor_pago < 0 %}valor-negativo{% endif %}">{{ pagamento.valor_pago|floatformat:0|default:"" }}</td>
-                    <td class="align-middle text-center">{{ pagamento.tipo_pagamento }}</td>
+                    <td class="align-middle text-center">{{ pagamento.tipo_pagamento|upper }}</td>
                     <td class="align-middle text-center {% if pagamento.emprestimo.calcular_saldo_devedor < 0 %}valor-negativo{% else %}valor-devido{% endif %} small">
                         {{ pagamento.emprestimo.calcular_saldo_devedor|floatformat:0|default:"0.00" }}
                     </td>
@@ -245,8 +245,21 @@
     });
 
     function limparFiltros() {
-        document.getElementById('filterForm').reset();
-        document.getElementById('filterForm').submit();
+        const form = document.getElementById('filterForm');
+        const inputs = form.getElementsByTagName('input');
+        const selects = form.getElementsByTagName('select');
+
+        for (let i = 0; i < inputs.length; i++) {
+            if (inputs[i].type === 'text' || inputs[i].type === 'date') {
+                inputs[i].value = '';
+            }
+        }
+
+        for (let i = 0; i < selects.length; i++) {
+            selects[i].selectedIndex = 0;
+        }
+
+        form.submit();
     }
 </script>
 {% endblock %}

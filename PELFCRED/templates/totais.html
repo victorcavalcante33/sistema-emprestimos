@@ -127,16 +127,15 @@
             </thead>
             <tbody>
                 <tr>
-                    <td>Clientes Novos</td>
-                    <td class="text-end fw-bold">{{ total_nv }}</td>
+                    <td class="text-end fw-bold align-middle text-center"><a href="#" data-bs-toggle="modal" data-bs-target="#clientesNovosModal">Clientes Novos</a></td>
+                    <td class="text-end fw-bold"><a href="#" data-bs-toggle="modal" data-bs-target="#clientesNovosModal">{{ total_nv }}</a></td>
                 </tr>
-                <tr>
-                    <td>Inadimplentes</td>
-                    <td class="text-end fw-bold" id="total-inadimplentes">{{ total_inadimplentes }}</td>
+                    <td class="text-end fw-bold text-danger align-middle text-center">Inadimplentes</td>
+                    <td class="text-end fw-bold text-danger" id="total-inadimplentes">{{ total_inadimplentes }}</td>
                 </tr>
                 <tr>
                     <td>NV</td>
-                    <td class="text-end fw-bold">{{ total_geral.total_emprestimos }}</td>
+                    <td class="text-end fw-bold" id="total-nvc">{{ total_nvc }}</td>
                 </tr>
                 <tr>
                     <td>NG</td>
@@ -164,7 +163,7 @@
                     <th>Contrato</th>
                     <th>Total Saldo</th>
                     <th>Saída (Capital)</th>
-                    <th>Juros</th>
+                    <th>Lucro</th>
                     <th>Total Pago</th>
                     <th>Tipo de Pagamento</th>
                     <th>Grupo</th>
@@ -181,17 +180,18 @@
                             AC
                         {% elif emprestimo.status == 'R' %}
                             R
-                            {% elif emprestimo.status == 'NG' %}
+                        {% elif emprestimo.status == 'NG' %}
                             NG
                         {% else %}
                             {{ emprestimo.status }}
                         {% endif %}
                     </td>
+                   
                     <td>{{ emprestimo.cliente.apelido }}<div class="small">{{ emprestimo.cliente.nome }}</div></td>
                                 <td>{{ emprestimo.id }}</td>
                                 <td>{{ emprestimo.saldo_devedor|floatformat:0 }}</td>
-                                <td>{{ emprestimo.capital }}</td>
-                                <td>{{ emprestimo.calcular_valor_juros|floatformat:0 }}</td>
+                                <td>{{ emprestimo.capital_adicional_total|floatformat:0 }}</td>
+                                <td>{{ emprestimo.total_juros_recebidos|floatformat:0 }}</td>
                                 <td>
                                     {% for pagamento in emprestimo.pagamentos.all %}
                                         {{ pagamento.valor_pago|floatformat:0 }}<br>
@@ -199,7 +199,7 @@
                                 </td>
                                 <td>
                                     {% for pagamento in emprestimo.pagamentos.all %}
-                                        {{ pagamento.tipo_pagamento }}<br>
+                                        {{ pagamento.tipo_pagamento|upper }}<br>
                                     {% endfor %}
                                 </td>
                                 <td>{{ emprestimo.grupo.name }}</td>
@@ -209,6 +209,39 @@
             </tbody>
         </table>
     </div>
+
+    <!-- Modal de Clientes Novos -->
+    <div class="modal fade" id="clientesNovosModal" tabindex="-1" aria-labelledby="clientesNovosModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="clientesNovosModalLabel">Clientes Novos</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Nome</th>
+                                <th>Apelido</th>
+                                <th>Data de Cadastro</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for cliente in clientes %}
+                            <tr>
+                                <td>{{ cliente.nome }}</td>
+                                <td>{{ cliente.apelido }}</td>
+                                <td>{{ cliente.data_registro|date:"d/m/Y" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         function limparFiltros() {
             var form = document.getElementById('filterForm');

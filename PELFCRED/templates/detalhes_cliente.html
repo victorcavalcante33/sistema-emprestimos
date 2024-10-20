@@ -58,14 +58,17 @@
                                 <p class="mb-2"><strong>Complemento:</strong> {{ cliente.complemento|default:"" }}</p>
                                 <p class="mb-2"><strong>UF:</strong> {{ cliente.uf|default:"" }}</p>
                                 <p class="mb-2"><strong>Cidade:</strong> {{ cliente.cidade|default:"" }}</p>
+                                <p class="mb-2"><strong>Grupo</strong> {{ cliente.grupo.name|default:"" }}</p>
                             </div>
                             <div class="col-12 text-center">
+                                <p class="mb"><strong>Registro:</strong> {{ cliente.data_registro|date:"d/m/Y H:i" }}</p>
                                 <p class="mb-2">
+                                    
                                     <strong>Status:</strong>
                                     <span class="status-dot {% if not cliente.bloqueado %}status-dot-active{% else %}status-dot-inactive{% endif %}"></span>
                                     {% if not cliente.bloqueado %}Ativo{% else %}Inativo{% endif %}
                                 </p>
-                                <p class="mb-2"><strong>Registro:</strong> {{ cliente.data_registro|date:"d/m/Y H:i" }}</p>
+                                
                             </div>
                         </div>
                     </div>

@@ -563,101 +563,60 @@ def cadastrar_cliente(request):
 
 @login_required
 def lista_emprestimos(request):
-    user_group = request.user.groups.first()
-    emprestimos = Emprestimo.objects.filter(grupo=user_group)
+    user = request.user
+    user_group = user.groups.first()  # Grupo do usuário logado
+
+    # Inicializar o queryset de empréstimos
     emprestimos = Emprestimo.objects.all()
-    # Anotar o queryset com o campo 'juros' calculado
-    emprestimos = emprestimos.annotate(
-    juros=ExpressionWrapper(
-            F('valor_total') - F('capital'),
-            output_field=DecimalField(max_digits=10, decimal_places=2)
-        )
-    )
-          # Se o usuário não for superusuário, filtrar apenas os clientes do grupo do usuário
-    if not request.user.is_superuser:
-        user_group = request.user.groups.first()
-        emprestimos = Emprestimo.objects.filter(grupo=user_group)
-    else:
-        # Superusuários podem ver todos os clientes, sem limitação de grupo
-        emprestimos = Emprestimo.objects.all()
 
-    # Filtros
-    search_query = request.GET.get('search', '')
-    grupo = request.GET.get('grupo', '')
-    usuario = request.GET.get('usuario', '')
-    dias_semana = request.GET.get('dias_semana', '')
-    data_registro_inicio = request.GET.get('data_registro_inicio', '')
-    data_registro_fim = request.GET.get('data_registro_fim', '')
-    data_vencimento_inicio = request.GET.get('data_vencimento_inicio', '')
-    data_vencimento_fim = request.GET.get('data_vencimento_fim', '')
-    valor_min = request.GET.get('valor_min', '')
-    valor_max = request.GET.get('valor_max', '')
-    taxa_juros_min = request.GET.get('taxa_juros_min', '')
-    taxa_juros_max = request.GET.get('taxa_juros_max', '')
-    valor_total_min = request.GET.get('valor_total_min', '')
-    valor_total_max = request.GET.get('valor_total_max', '')
-    saldo_devedor_min = request.GET.get('saldo_devedor_min', '')
-    saldo_devedor_max = request.GET.get('saldo_devedor_max', '')
-    juros_min = request.GET.get('juros_min', '')
-    juros_max = request.GET.get('juros_max', '')
-    status_filtro = request.GET.get('status', 'ativos')
-    campo_labels = [
-        ('valor_min', 'Capital Mínimo'),
-        ('valor_max', 'Máximo'),
-        ('taxa_juros_min', 'Taxa de Juros Mínima'),
-        ('taxa_juros_max', 'Máxima'),
-        ('juros_min', 'Juros Mínimo'),
-        ('juros_max', 'Máximo'),
-        ('valor_total_min', 'Valor Total Mínimo'),
-        ('valor_total_max', 'Máximo'),
-        ('saldo_devedor_min', 'Saldo Devedor Mínimo'),
-        ('saldo_devedor_max', 'Máximo'),
-    ]
-    # Prepare the fields with their values from request.GET
-    fields = []
-    for campo, label in campo_labels:
-        value = request.GET.get(campo, '')
-        fields.append({'campo': campo, 'label': label, 'value': value})
+    # Se o usuário não for admin, filtrar por grupo e usuário
+    if not user.is_superuser:
+        emprestimos = emprestimos.filter(grupo=user_group, usuario=user)
 
-    if taxa_juros_min:
-        emprestimos = emprestimos.filter(taxa_juros__gte=Decimal(taxa_juros_min))
-    if taxa_juros_max:
-        emprestimos = emprestimos.filter(taxa_juros__lte=Decimal(taxa_juros_max))
+    # Filtros de busca e status
+    search_query = request.GET.get('search', None)
+    grupo_filtrado = request.GET.get('grupo', None)
+    usuario_filtrado = request.GET.get('usuario', None)
+    status_filtrado = request.GET.get('status', None)
+    dias_semana = request.GET.get('dias_semana', None)
+    data_registro_inicio = request.GET.get('data_registro_inicio', None)
+    data_registro_fim = request.GET.get('data_registro_fim', None)
+    data_vencimento_inicio = request.GET.get('data_vencimento_inicio', None)
+    data_vencimento_fim = request.GET.get('data_vencimento_fim', None)
 
-    # Filtro por busca (CPF, Nome ou Apelido do cliente associado ao empréstimo)
+    # Aplicar filtros por grupo e usuário se for admin
+    if user.is_superuser:
+        if grupo_filtrado:
+            emprestimos = emprestimos.filter(grupo__name=grupo_filtrado)
+        if usuario_filtrado:
+            emprestimos = emprestimos.filter(usuario__username=usuario_filtrado)
+
+    # Filtro por status (ativos, finalizados, inadimplentes)
+    if status_filtrado:
+        if status_filtrado == 'ativos':
+            emprestimos = emprestimos.filter(Q(status='ativo') | Q(status='NG') | Q(status='R'), saldo_devedor__gt=0)
+        elif status_filtrado == 'finalizados':
+            emprestimos = emprestimos.filter(status='finalizado', saldo_devedor=0)
+        elif status_filtrado == 'inadimplentes':
+            emprestimos = emprestimos.filter(status='inadimplentes')
+        elif status_filtrado == 'Renovados':
+            emprestimos = emprestimos.filter(status='R', saldo_devedor__gt=0)
+        elif status_filtrado == 'Negociados':   
+            emprestimos = emprestimos.filter(status='NG')
+
+    # Filtro por busca (CPF, Nome, Apelido ou ID do contrato)
     if search_query:
         emprestimos = emprestimos.filter(
             Q(cliente__nome__icontains=search_query) |
             Q(cliente__apelido__icontains=search_query) |
             Q(cliente__cpf__icontains=search_query) |
-            Q(id__icontains=search_query)  # Adiciona o filtro por ID do empréstimo
+            Q(id__icontains=search_query)  # Filtro por ID do contrato
         )
-        
-    # Captura o filtro de status
-    status_filtro = request.GET.get('status', 'ativos')  # Default: ativos
-
-    if status_filtro == 'ativos':
-        emprestimos = emprestimos.filter(status='ativo', saldo_devedor__gt=0)
-    elif status_filtro == 'finalizados':
-        emprestimos = emprestimos.filter(status='finalizado', saldo_devedor=0)
-    elif status_filtro == 'inadimplentes':
-        emprestimos = emprestimos.filter(status='inadimplentes')
-
-
-    # Filtro por grupo
-    if grupo:
-        emprestimos = emprestimos.filter(grupo__name=grupo)
-
-    # Filtro por usuário
-    if usuario:
-        emprestimos = emprestimos.filter(usuario__username=usuario)
 
     # Filtro por dias da semana
     if dias_semana:
         emprestimos = emprestimos.filter(dias_semana__icontains=dias_semana)
-        
 
-            
     # Filtro por datas de registro
     if data_registro_inicio and data_registro_fim:
         emprestimos = emprestimos.filter(data_inicio__range=[data_registro_inicio, data_registro_fim])
@@ -673,33 +632,9 @@ def lista_emprestimos(request):
         emprestimos = emprestimos.filter(data_vencimento__gte=data_vencimento_inicio)
     elif data_vencimento_fim:
         emprestimos = emprestimos.filter(data_vencimento__lte=data_vencimento_fim)
-    # Filtro por valores de empréstimo
-    # Filtro Valor Total
-    if valor_total_min:
-        emprestimos = emprestimos.filter(valor_total__gte=Decimal(valor_total_min))
-    if valor_total_max:
-        emprestimos = emprestimos.filter(valor_total__lte=Decimal(valor_total_max))
-    # Filtro Saldo
-    if saldo_devedor_min:
-        emprestimos = emprestimos.filter(saldo_devedor__gte=Decimal(saldo_devedor_min))
-    if saldo_devedor_max:
-        emprestimos = emprestimos.filter(saldo_devedor__lte=Decimal(saldo_devedor_max))
-    # Filtro Juros    
-    if juros_min:
-        emprestimos = emprestimos.filter(juros__gte=Decimal(juros_min))
-    if juros_max:
-        emprestimos = emprestimos.filter(juros__lte=Decimal(juros_max))
-        
-    # Filtro Capital
-    if valor_min:
-        emprestimos = emprestimos.filter(capital__gte=Decimal(valor_min))
-    if valor_max:
-        emprestimos = emprestimos.filter(capital__lte=Decimal(valor_max))
-
-
 
     # Ordenação com mapeamento
-    ordenar_por = request.GET.get('ordenar_por', '')
+    ordenar_por = request.GET.get('ordenar_por', 'cliente__nome')
     ordenar_por_dict = {
         'nome_asc': 'cliente__nome',
         'nome_desc': '-cliente__nome',
@@ -717,16 +652,15 @@ def lista_emprestimos(request):
         'data_inicio_desc': '-data_inicio',
         'data_vencimento_asc': 'data_vencimento',
         'data_vencimento_desc': '-data_vencimento',
-        'juros_asc': 'taxa_juros',
-        'juros_desc': '-taxa_juros',
+        'juros_asc': 'juros',
+        'juros_desc': '-juros',
         'semana_asc': 'dias_semana',
         'semana_desc': '-dias_semana',
     }
+
+    # Verifica se a chave de ordenação existe no dicionário, caso contrário, ordena por nome do cliente
     if ordenar_por in ordenar_por_dict:
         emprestimos = emprestimos.order_by(ordenar_por_dict[ordenar_por])
-    else:
-        emprestimos = emprestimos.order_by('cliente__nome')
-
 
     # Paginação
     paginator = Paginator(emprestimos, 10)  # 10 empréstimos por página
@@ -734,54 +668,27 @@ def lista_emprestimos(request):
     emprestimos_paginados = paginator.get_page(page)
 
     # Obtenção de grupos e usuários para os filtros
-    grupo = Group.objects.all()
-    usuario = User.objects.all()
+    grupos = Group.objects.all()
+    usuarios = User.objects.all()
 
-     # Paginação
-    paginator = Paginator(emprestimos, 10)
-    page = request.GET.get('page')
-    emprestimos_paginados = paginator.get_page(page)
-
-    # Preparação do contexto
+    # Preparação do contexto para renderização
     context = {
         'emprestimos': emprestimos_paginados,
         'page_obj': emprestimos_paginados,
-        'fields': [{'campo': campo, 'label': label, 'value': request.GET.get(campo, '')}
-                   for campo, label in [
-                       ('valor_min', 'Capital Mínimo'),
-                       ('valor_max', 'Capital Máximo'),
-                       ('taxa_juros_min', 'Taxa de Juros Mínima'),
-                       ('taxa_juros_max', 'Taxa de Juros Máxima'),
-                       ('juros_min', 'Juros Mínimo'),
-                       ('juros_max', 'Juros Máximo'),
-                       ('valor_total_min', 'Valor Total Mínimo'),
-                       ('valor_total_max', 'Valor Total Máximo'),
-                       ('saldo_devedor_min', 'Saldo Devedor Mínimo'),
-                       ('saldo_devedor_max', 'Saldo Devedor Máximo'),
-                   ]],
         'search_query': search_query,
+        'grupos': grupos,
+        'usuarios': usuarios,
+        'status_filtro': status_filtrado,
         'dias_semana': dias_semana,
         'data_registro_inicio': data_registro_inicio,
         'data_registro_fim': data_registro_fim,
         'data_vencimento_inicio': data_vencimento_inicio,
         'data_vencimento_fim': data_vencimento_fim,
         'ordenar_por': ordenar_por,
-        'valor_min': valor_min,
-        'valor_max': valor_max,
-        'grupos': Group.objects.all(),
-        'usuario': User.objects.all(),
-        'taxa_juros_min': taxa_juros_min,
-        'taxa_juros_max': taxa_juros_max,
-        'valor_total_min': valor_total_min,
-        'valor_total_max': valor_total_max,
-        'saldo_devedor_min': saldo_devedor_min,
-        'saldo_devedor_max': saldo_devedor_max,
-        'juros_min': juros_min,
-        'juros_max': juros_max,
-        'status_filtro': status_filtro,
     }
 
     return render(request, 'lista_emprestimos.html', context)
+
 
 logger = logging.getLogger(__name__)
 
@@ -808,6 +715,7 @@ def marcar_inadimplente(request, id_emprestimo):
         logger.warning("A requisição não foi do tipo POST.")
     
     return redirect('PELFCRED:detalhes_cliente', cpf=emprestimo.cliente.cpf)
+
 
 
 
@@ -1217,6 +1125,7 @@ def totais(request):
     usuario_filtrado = request.GET.get('usuario', '')
     data_inicio = request.GET.get('data_inicio', '')
     data_fim = request.GET.get('data_fim', '')
+    status_filtro = request.GET.get('status', 'NV')
 
     # Obtenção do usuário atual e seu grupo
     user = request.user
@@ -1294,6 +1203,16 @@ def totais(request):
             Q(data_renovacao__lte=data_fim_datetime)
         )
         pagamentos = pagamentos.filter(data_pagamento__lte=data_fim_datetime)
+        
+            # Aplicação dos filtros por data de status e pagamentos
+    if data_inicio and data_fim:
+        emprestimos = emprestimos.filter(Q(data_inicio__gte=data_inicio) & Q(data_vencimento__lte=data_fim))
+        pagamentos = pagamentos.filter(Q(data_pagamento__date__range=[data_inicio, data_fim]))
+        emprestimos_query = emprestimos_query.filter(data_inicio__range=[data_inicio, data_fim])
+
+    # Filtrar clientes pelo status do relatório
+    if status_filtro:
+        clientes = clientes.filter(status_relatorio=status_filtro)
 
     # Atualizar os conjuntos de dados base após os filtros de data
     clientes_base = clientes
@@ -1342,7 +1261,7 @@ def totais(request):
     # Contabilização dos totais usando os conjuntos de dados base
     total_nv = clientes_base.filter(status_relatorio='NV').count()
     total_nvc = emprestimos_base.filter(status='ativo').count()
-    total_ng = emprestimos_base.filter(status='NG', capital__lte=0).count()
+    total_ng = emprestimos_base.filter(status='NG').count()
     total_r = emprestimos_base.filter(status='R', capital__gt=0).count()
     total_ac = emprestimos_base.filter(status='finalizado').count()
 

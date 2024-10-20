@@ -48,6 +48,8 @@
                                             <option value="ativos" {% if request.GET.status == 'ativos' %}selected{% endif %}>Ativos</option>
                                             <option value="finalizados" {% if request.GET.status == 'finalizados' %}selected{% endif %}>Finalizados</option>
                                             <option value="inadimplentes" {% if request.GET.status == 'inadimplentes' %}selected{% endif %}>Inadimplentes</option>
+                                            <option value='Renovados' {% if request.GET.status == 'R' %}selected{% endif %}>Renovados</option>
+                                            <option value='Negociados' {% if request.GET.status == 'NG' %}selected{% endif %}>Negociados</option>
                                         </select>
                                     </div>
 
@@ -118,24 +120,6 @@
                         </div>
                     </div>
 
-                    <!-- Filtros por Valores -->
-                    <div class="mb-2">
-                        <h5 class="form-label">Filtros por Valores</h5>
-                    </div>
-
-                    {% for field in fields %}
-
-                        {% if forloop.counter0|divisibleby:2 %}
-                        <div class="row mb-2">
-                        {% endif %}
-                            <div class="col-sm-6">
-                                <label for="{{ field.campo }}" class="form-label"></label>
-                                <input type="number" step="0.01" name="{{ field.campo }}" class="form-control form-control-sm" placeholder="{{ field.label }}" value="{{ field.value }}">
-                            </div>
-                        {% if forloop.counter0|add:1|divisibleby:2 or forloop.last %}
-                        </div>
-                        {% endif %}
-                    {% endfor %}
                     <!-- Botões -->
                     <div class="d-flex justify-content-between">
                         <button type="submit" class="btn btn-primary btn-sm">Aplicar</button>
@@ -236,6 +220,13 @@
     </a>
 </th>
 
+<th>
+    <a href="?{% querystring ordenar_por=ordenar_por|toggle_order:'status_asc,status_desc' %}">
+        Status
+        {% if ordenar_por == 'status_asc' %}▲{% elif ordenar_por == 'status_desc' %}▼{% endif %}
+    </a>
+</th>
+
 <!-- Grupo -->
 <th>
     <a href="?{% querystring ordenar_por=ordenar_por|toggle_order:'grupos_asc,grupos_desc' %}">
@@ -267,6 +258,7 @@
                     <td class="align-middle">{{ emprestimo.data_vencimento|date:"d/m/Y" }}</td>
                     <td class="align-middle">{{ emprestimo.get_dias_semana_display|join:", " }}</td>
                     <td class="align-middle">{{ emprestimo.parcelas_info}}</td>
+                    <td class="align-middle">{{ emprestimo.get_status_display }}</td>
                     <td class="align-middle">{{ emprestimo.grupo.name }}</td>
                     <td class="align-middle">{{ emprestimo.usuario.username }}</td>
                      <td class="align-middle text-center">
