@@ -4,10 +4,10 @@
 {% block title %}Pagamentos a Verificar{% endblock %}
 {% block content %}
 
-<div class="container">
-    <h3 class="text-primary text-center">Pagamentos</h3>
+<div class="container text-center">
+    <h3 class="text-primary">Pagamentos</h3>
         <!-- Total dos Pagamentos -->
-        <div class="text-end mb-2">
+        <div class="mb-2">
             <strong class="mb-2 text-primary">PIX: </strong>
             <span class="valor-pago">{{ total_pix|floatformat:0 }}</span>
             <br>
@@ -17,12 +17,11 @@
             <strong class="mb-2 text-primary">Total: </strong>
             <span class="valor-pago">{{ total_pagamentos|floatformat:0 }}</span>
         </div>        
-    <div class="d-flex flex-wrap justify-content-between align-items-center mb-1">
+    <div class="d-flex flex-wrap justify-content-center align-items-center mb-1">
         <!-- Botão Filtros e Busca -->
         <button type="button" class="btn btn-primary mb-2" data-bs-toggle="modal" data-bs-target="#filterModal">
             Filtros e Busca
         </button>
-
     </div>
 
     <!-- Modal para Filtros e Busca -->
@@ -91,6 +90,7 @@
                 <tr>
                     <th>Cliente</th>
                     <th>Data</th>
+                    <th>Hora</th>
                     <th>Pagamento</th>
                     <th>Tipo de Pagamento</th>
                     <th>Saldo</th>
@@ -100,24 +100,32 @@
                     {% if is_admin %}<th></th>{% endif %}
                 </tr>
             </thead>
-            <tbody >
+            <tbody>
                 {% for pagamento in pagamentos %}
                 <tr>
-                    <td class="align-middle text-center">{{ pagamento.emprestimo.cliente.apelido }}<div class="small">{{ pagamento.emprestimo.cliente.nome }}</div></td>
-                    <td class="align-middle text-center">{{ pagamento.data_pagamento|date:"d/m/Y" }}</td>
-                    <td class="small align-middle text-center {% if pagamento.valor_pago > 0 %}valor-pago{% elif pagamento.valor_pago < 0 %}valor-negativo{% endif %}">{{ pagamento.valor_pago|floatformat:0|default:"" }}</td>
-                    <td class="align-middle text-center">{{ pagamento.tipo_pagamento|upper }}</td>
-                    <td class="align-middle text-center {% if pagamento.emprestimo.calcular_saldo_devedor < 0 %}valor-negativo{% else %}valor-devido{% endif %} small">
+                    <td class="align-middle">{{ pagamento.emprestimo.cliente.apelido }}<div class="small">{{ pagamento.emprestimo.cliente.nome }}</div></td>
+                    <td class="align-middle">{{ pagamento.data_pagamento|date:"d/m/Y" }}</td>
+                    <td class="align-middle">{{ pagamento.data_pagamento|date:"H:i" }}</td>
+                    <td class="small align-middle {% if pagamento.valor_pago > 0 %}valor-pago{% elif pagamento.valor_pago < 0 %}valor-negativo{% endif %}">{{ pagamento.valor_pago|floatformat:0|default:"" }}</td>
+                    <td class="align-middle">{{ pagamento.tipo_pagamento|upper }}</td>
+                    <td class="align-middle {% if pagamento.emprestimo.calcular_saldo_devedor < 0 %}valor-negativo{% else %}valor-devido{% endif %} small">
                         {{ pagamento.emprestimo.calcular_saldo_devedor|floatformat:0|default:"0.00" }}
                     </td>
-                    <td class="align-middle text-center">{{ pagamento.emprestimo.grupo.name }}</td>
-                    <td class="align-middle text-center">{{ pagamento.emprestimo.usuario.username }}</td>
-                    <td class="align-middle text-center">{{ pagamento.emprestimo.id }}</td>
+                    <td class="align-middle">{{ pagamento.emprestimo.grupo.name }}</td>
+                    <td class="align-middle">{{ pagamento.emprestimo.usuario.username }}</td>
+                    <td class="align-middle">{{ pagamento.emprestimo.id }}</td>
                     {% if is_admin %}
                     <td>
-                        <button type="button" class="btn btn-danger btn-sm btn-rejeitar" data-pagamento-id="{{ pagamento.id }}">
-                            Rejeitar
-                        </button>
+
+                        {% if is_admin %}
+                        <td>
+                                <button type="submit" class="btn btn-danger btn-sm btn-rejeitar" data-pagamento-id="{{ pagamento.id }}" data-hoje="{% if pagamento.data_pagamento|date:"Y-m-d" != hoje %}{% endif %}" >
+                                    Rejeitar
+                                </button>
+                            {% if pagamento.data_pagamento|date:"Y-m-d" != hoje %}
+                            {% endif %}
+                        </td>
+                    {% endif %}
                     </td>
                     {% endif %}
                 </tr>
@@ -219,7 +227,7 @@
                         location.reload();
                     });
                 } else {
-                    Swal.fire('Erro', 'Ocorreu um erro ao rejeitar o pagamento.', 'error');
+                    Swal.fire('Erro', 'Pagamento não rejeitado, pagamentos apenas pode ser rejeitado no dia de hoje.', 'error');
                 }
             })
             .catch(error => {

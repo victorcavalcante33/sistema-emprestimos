@@ -194,14 +194,18 @@
                                 <td>{{ emprestimo.total_juros_recebidos|floatformat:0 }}</td>
                                 <td>
                                     {% for pagamento in emprestimo.pagamentos.all %}
-                                        {{ pagamento.valor_pago|floatformat:0 }}<br>
+                                        {% if pagamento.data_pagamento.date == today %}
+                                            {{ pagamento.valor_pago|floatformat:0 }}<br>
+                                        {% endif %}
                                     {% endfor %}
                                 </td>
                                 <td>
                                     {% for pagamento in emprestimo.pagamentos.all %}
-                                        {{ pagamento.tipo_pagamento|upper }}<br>
+                                        {% if pagamento.data_pagamento.date == today %}
+                                            {{ pagamento.tipo_pagamento|upper }}<br>
+                                        {% endif %}
                                     {% endfor %}
-                                </td>
+                                </td>                                                               
                                 <td>{{ emprestimo.grupo.name }}</td>
                                 <td>{{ emprestimo.usuario.username }}</td>
                             </tr>

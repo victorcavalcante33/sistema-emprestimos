@@ -100,6 +100,13 @@ class Emprestimo(models.Model):
     numero_parcelas = models.IntegerField(default=12)
     valor_parcelado = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     valor_total_calculado = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    status_anterior = models.CharField(max_length=20, blank=True, null=True)
+    
+    def salvar_status_anterior(self):
+        if self.status != 'finalizado':
+            self.status_anterior = self.status  # Armazena o status atual como o status anterior
+    
+    
     def parcelas_info(self):
         return f"{self.numero_parcelas}x{self.valor_parcelado:.0f}"
     grupo = models.ForeignKey(Group, on_delete=models.CASCADE, null=True, blank=True)

@@ -18,6 +18,7 @@ from django.utils.dateparse import parse_date
 from django.contrib.auth.decorators import user_passes_test
 from django.db import transaction
 from django.contrib.auth import authenticate, login
+from django.utils.timezone import now
 
 logger = logging.getLogger(__name__)
 
@@ -979,15 +980,47 @@ def analisar_pagamentos(request):
 @login_required
 def rejeitar_pagamento(request, pagamento_id):
     if request.method == 'POST':
-        # Busque o pagamento a ser rejeitado
-        pagamento = get_object_or_404(Pagamento, id=pagamento_id)
-        
-        # Lógica para rejeitar o pagamento (pode ser ajustar o status, deletar, etc.)
-        pagamento.delete()  # Exemplo: deletando o pagamento rejeitado
-        
-        return JsonResponse({'success': True})
-    
-    return JsonResponse({'success': False, 'error': 'Método não permitido'}, status=405)
+        try:
+            # Busque o pagamento a ser rejeitado
+            pagamento = get_object_or_404(Pagamento, id=pagamento_id)
+            emprestimo = pagamento.emprestimo
+
+            # Verificar se o pagamento foi feito hoje
+            hoje = timezone.now().date()
+            if pagamento.data_pagamento.date() != hoje:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Você só pode rejeitar pagamentos feitos no dia de hoje.'
+                }, status=400)
+
+
+            # Deleta o pagamento rejeitado
+            pagamento.delete()
+
+            # Recalcular o total de juros recebidos após o pagamento ser rejeitado
+            total_pago = emprestimo.total_pago()
+            juros_recebido = max(0, total_pago - emprestimo.capital_inicial - emprestimo.capital_adicional)
+
+            emprestimo.total_juros_recebidos = juros_recebido
+            emprestimo.save()
+
+            # Verifica se o status do empréstimo era 'finalizado' e restaura o status anterior, se houver
+            if emprestimo.status == 'finalizado' and emprestimo.status_anterior:
+                emprestimo.status = emprestimo.status_anterior  # Restaura o status anterior
+                emprestimo.status_anterior = None  # Limpa o campo status_anterior após a restauração
+                emprestimo.save()
+
+            # Retorna uma resposta de sucesso em JSON
+            return JsonResponse({'success': True, 'message': 'Pagamento rejeitado, juros atualizados e status do empréstimo restaurado.'})
+
+        except Exception as e:
+            logger.error(f"Erro ao rejeitar pagamento: {e}")
+            return JsonResponse({'success': False, 'message': 'Erro ao rejeitar o pagamento.'}, status=500)
+
+    return JsonResponse({'success': False, 'message': 'Método não permitido.'}, status=405)
+
+
+
 
 @login_required
 def importar_comprovante_pix(request):
@@ -1059,14 +1092,38 @@ def registrar_pagamento(request, id_emprestimo=None):
                 usuario=request.user
             )
             logger.debug(f"Pagamento {pagamento.id} registrado para o empréstimo {emprestimo.id} com valor {valor_pago} em {pagamento.data_pagamento}")
-
+            
+            # Calcular o total pago até o momento, incluindo o pagamento atual
+            total_pago_atualizado = valor_pago_total + valor_pago
+            
             # Atualizar o saldo devedor
             emprestimo.saldo_devedor = emprestimo.calcular_saldo_devedor()
             emprestimo.save()
             logger.debug(f"Empréstimo {emprestimo.id}: Saldo devedor após pagamento: {emprestimo.saldo_devedor}")
             
+            # Verifica se o total pago é maior ou igual ao valor total do empréstimo
+            if total_pago_atualizado >= emprestimo.valor_total:
+                # Salvar o status anterior antes de finalizar
+                emprestimo.status_anterior = emprestimo.status  # Salva o status atual
+                emprestimo.status = 'finalizado'  # Muda para 'finalizado'
+                emprestimo.saldo_devedor = Decimal('0.00')  # Zera o saldo devedor
+                emprestimo.save()
+                logger.debug(f"Empréstimo {emprestimo.id} finalizado com sucesso.")
+            
+            # Calcular o lucro (juros recebidos)
+            total_pago = emprestimo.total_pago()  # Total pago até o momento
+            total_investido = emprestimo.capital_inicial + emprestimo.capital_adicional
+
+            # Juros recebidos é a diferença entre o total pago e o capital investido
+            juros_recebido = max(Decimal('0.00'), total_pago - total_investido)
+
+            # Atualizar o campo de juros recebidos
+            emprestimo.total_juros_recebidos = juros_recebido
+            emprestimo.save()
+                
             # Verifica se o empréstimo deve ser finalizado
-            emprestimo.verificar_finalizacao()
+            if total_pago_atualizado >= emprestimo.valor_total:
+                emprestimo.verificar_finalizacao()
             
             messages.success(request, 'Pagamento registrado com sucesso!')
             return redirect('PELFCRED:detalhes_cliente', cpf=emprestimo.cliente.cpf)
@@ -1079,6 +1136,7 @@ def registrar_pagamento(request, id_emprestimo=None):
         'valor_pago_total': valor_pago_total,  # Exibe o total pago até agora
         'saldo_devedor': saldo_devedor,  # Exibe o saldo devedor correto
     })
+
     
 @login_required
 def finalizar_contrato(request, id_emprestimo):
@@ -1092,9 +1150,10 @@ def finalizar_contrato(request, id_emprestimo):
         messages.error(request, "O contrato não pode ser finalizado. O valor total ainda não foi pago.")
         return redirect('PELFCRED:detalhes_cliente', cpf=emprestimo.cliente.cpf)
 
-    # Calcular os juros recebidos e atualizar o campo total_juros_recebidos
-    juros_recebido = emprestimo.total_juros_recebidos + max(0, total_pago - emprestimo.capital_inicial - emprestimo.capital_adicional)
+    # Calcular os juros recebidos
+    juros_recebido = max(0, total_pago - emprestimo.capital_inicial - emprestimo.capital_adicional)
     
+    # Atualizar o campo de juros recebidos
     emprestimo.total_juros_recebidos = juros_recebido
     emprestimo.status = 'finalizado'
     emprestimo.save()
@@ -1293,7 +1352,9 @@ def totais(request):
     )['total'] or Decimal(0)
 
     # Cálculo do total geral
+
     total_geral = {
+
         'total_clientes': clientes_base.count(),
         'total_emprestimos': emprestimos_base.count(),
         'total_investido': total_investido,
@@ -1302,6 +1363,7 @@ def totais(request):
 
     # Contexto para o template
     contexto = {
+        'today': now().date(),
         'total_juros_recebidos': total_juros_recebidos,
         'clientes': clientes,
         'emprestimos': emprestimos,
