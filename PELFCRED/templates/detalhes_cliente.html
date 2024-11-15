@@ -97,9 +97,10 @@
                                                             <p class="mb-2 contract-info text-center"><strong>Capital:</strong> R$ {{ emprestimo.capital|floatformat:2 }}</p>
                                                             <p class="mb-2 contract-info text-center"><strong>Taxa:</strong> {{ emprestimo.taxa_juros|floatformat:2 }}%</p>
                                                             <p class="mb-2 contract-info text-center"><strong>Juros:</strong> R$ {{ emprestimo.calcular_valor_juros|floatformat:2 }}</p>
+                                                            <p class="mb-2 contract-info text-center"><strong>Parcela/Valor:</strong> {{ emprestimo.parcelas_info }}</p>
                                                             <p class="mb-2 contract-info text-center"><strong>Total:</strong> R$ {{ emprestimo.valor_total|floatformat:2 }}</p>
-                                                            <p class="mb-2 contract-info text-center"><strong>Saldo:</strong> R$ {{ emprestimo.saldo_devedor_atual|floatformat:2 }}</p>
                                                             <p class="mb-3 contract-info text-center"><strong>Total Pago:</strong> R$ {{ emprestimo.total_pago|floatformat:2 }}</p>
+                                                            <p class="mb-2 contract-info text-center"><strong>Saldo:</strong> R$ {{ emprestimo.saldo_devedor|floatformat:2 }}</p>
                                                             <p class="mb-2 contract-info text-center"><strong>Frequência:</strong> {{ emprestimo.frequencia|capfirst|default:"" }}</p>
                                                             <p class="mb-2 contract-info text-center"><strong>Semana:</strong> {{ emprestimo.get_dias_semana_display|join:", " }}</p>
                                                             <p class="mb-2 contract-info text-center"><strong>Registro:</strong> {{ emprestimo.data_inicio|date:"d/m/Y" }}</p>
@@ -151,7 +152,6 @@
                                                                     {% csrf_token %}
                                                                     <button type="submit" class="dropdown-item btn btn-link">Inadimplente</button>
                                                                 </form>
-                                                                <li><a class="dropdown-item" href="{% url 'PELFCRED:excluir_emprestimo' emprestimo.id %}">Excluir</a></li>
                                                             {% endif %}
                                                             <li><a class="dropdown-item" href="{% url 'PELFCRED:registrar_pagamento' emprestimo.id %}">Pagamento</a></li>
                                                         {% endif %}

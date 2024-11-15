@@ -1,13 +1,14 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
+from django.contrib.admin.views.decorators import staff_member_required
 from django.utils import timezone
 from django.http import JsonResponse, HttpResponse
-from django.db.models import Q, Sum, F, ExpressionWrapper, DecimalField
+from django.db.models import Q, Sum, F, ExpressionWrapper, DecimalField, Case, When, Value
 from django.contrib import messages
 from django.contrib.auth.models import Group, User
 from decimal import Decimal, InvalidOperation
-from .models import Emprestimo, Pagamento, Cliente, Parcela
-from .forms import EmprestimoForm, ClienteForm, ComprovantePIXForm
+from .models import Emprestimo, Pagamento, Cliente, Parcela, Saida, DescontoJuros
+from .forms import EmprestimoForm, ClienteForm, ComprovantePIXForm, EditarEmprestimoForm
 from datetime import timedelta, datetime, date
 import logging
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
@@ -20,6 +21,27 @@ from django.db import transaction
 from django.contrib.auth import authenticate, login
 from django.utils.timezone import now
 
+
+@login_required
+def load_usuarios(request):
+    grupo_id = request.GET.get('grupo_id')
+    if grupo_id:
+        usuarios = User.objects.filter(groups__id=grupo_id).order_by('username')
+    else:
+        usuarios = User.objects.none()
+    usuarios_data = [{'id': usuario.id, 'username': usuario.username} for usuario in usuarios]
+    return JsonResponse({'usuarios': usuarios_data})
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+def excluir_desconto(request, desconto_id):
+    if request.method == 'POST':
+        desconto = get_object_or_404(DescontoJuros, id=desconto_id)
+        desconto.delete()
+        messages.success(request, 'Desconto excluído com sucesso.')
+    else:
+        messages.error(request, 'Ação inválida.')
+    return redirect('PELFCRED:totais')
 logger = logging.getLogger(__name__)
 
 @login_required
@@ -80,6 +102,8 @@ def editar_parcelas(request, id_emprestimo):
             emprestimo.delete()  # Apaga o empréstimo se o usuário cancelar
             messages.info(request, 'Edição de parcelas cancelada e empréstimo removido.')
             return redirect('PELFCRED:lista_emprestimos')
+        
+        
 
     return render(request, 'editar_parcelas.html', {'emprestimo': emprestimo, 'parcelas': parcelas})
 
@@ -124,13 +148,14 @@ def buscar_cliente(request):
 def editar_cliente(request, cpf):
     cliente = get_object_or_404(Cliente, cpf=cpf)
     if request.method == 'POST':
-        form = ClienteForm(request.POST, instance=cliente)
+        form = ClienteForm(request.POST, instance=cliente, user=request.user)  # Passa o usuário ao formulário
         if form.is_valid():
             form.save()
             return redirect('PELFCRED:lista_clientes')
     else:
-        form = ClienteForm(instance=cliente)
+        form = ClienteForm(instance=cliente, user=request.user)  # Passa o usuário ao formulário
     return render(request, 'editar_cliente.html', {'form': form})
+
 
 @login_required
 def excluir_cliente(request, cpf):
@@ -303,11 +328,11 @@ def aplicar_filtros(request, clientes):
         clientes = clientes.filter(bloqueado=True)
 
     if data_inicio:
-        data_inicio_dt = datetime.strptime(data_inicio, '%Y-%m-%d')
+        data_inicio_dt = datetime.strptime(data_inicio, '%d/%m/%Y')
         clientes = clientes.filter(data_registro__gte=data_inicio_dt)
     
     if data_fim:
-        data_fim_dt = datetime.strptime(data_fim, '%Y-%m-%d')
+        data_fim_dt = datetime.strptime(data_fim, '%d/%m/%Y')
         clientes = clientes.filter(data_registro__lte=data_fim_dt)
         
     if data_range and ' até ' in data_range:
@@ -323,206 +348,133 @@ def aplicar_filtros(request, clientes):
 
 @login_required
 def exportar_pdf(request):
-    # Filtros da listagem de clientes
-    search_query = request.GET.get('search', None)
-    grupo_filtrado = request.GET.get('grupo', None)
-    usuario_filtrado = request.GET.get('usuario', None)
-    status_filtrado = request.GET.get('status', None)
-    data_inicio = request.GET.get('data_inicio', None)
-    data_fim = request.GET.get('data_fim', None)
-
-    clientes_query = Cliente.objects.all()
+    # Obter os empréstimos filtrados
+    emprestimos = filtrar_emprestimos(request)
     
-    # Pega todos os clientes do grupo do usuário logado, ou todos se for admin
-    if request.user.is_superuser:
-        clientes_query = Cliente.objects.all()
-    else:
-        clientes_query = Cliente.objects.filter(grupo=request.user.groups.first())
-        
-            # Aplica os filtros
-    clientes_query = aplicar_filtros(request, clientes_query)
-    
-    if search_query:
-        clientes_query = clientes_query.filter(
-            Q(nome__icontains=search_query) | 
-            Q(apelido__icontains=search_query) | 
-            Q(cpf__icontains=search_query) | 
-            Q(emprestimo__id__icontains=search_query)  # Adiciona busca por ID de empréstimo
-        )
-
-    if grupo_filtrado:
-        clientes_query = clientes_query.filter(grupo__name=grupo_filtrado)
-
-    if usuario_filtrado:
-        clientes_query = clientes_query.filter(usuario__username=usuario_filtrado)
-
-    if status_filtrado == 'ativo':
-        clientes_query = clientes_query.filter(bloqueado=False)
-    elif status_filtrado == 'inativo':
-        clientes_query = clientes_query.filter(bloqueado=True)
-
-    if data_inicio and data_fim:
-        try:
-            data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d').date()
-            data_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
-            clientes_query = clientes_query.filter(data_registro__range=(data_inicio, data_fim))
-        except ValueError:
-            messages.error(request, 'Formato de data inválido. Use o formato AAAA-MM-DD.')
-
-    emprestimos_query = Emprestimo.objects.filter(cliente__in=clientes_query)
-
-    # Calcula os totais gerais
-    total_a_receber = round(sum(
-        emprestimo.capital * (emprestimo.taxa_juros / 100)
-        for emprestimo in emprestimos_query
-    ), 2)
-
-    total_juros_recebidos = round(sum(
-        emprestimo.total_juros_recebidos for emprestimo in emprestimos_query
-    ), 2)
-
-    total_geral = {
-        'total_clientes': clientes_query.count(),
-        'total_investido': round(emprestimos_query.aggregate(Sum('capital'))['capital__sum'] or 0, 2),
-        'total_recebido': round(emprestimos_query.aggregate(Sum('valor_total'))['valor_total__sum'] or 0, 2),
-        'total_a_receber': total_a_receber,
-        'total_juros_recebidos': total_juros_recebidos,
-        'total_emprestimos': emprestimos_query.count(),
-    }
-
     # Renderiza o template PDF com os dados filtrados
     context = {
-        'total_geral': total_geral,
-        'clientes': clientes_query,
+        'emprestimos': emprestimos,
     }
-
-    template_path = 'clientes_contratos_pdf.html'  # Este é o template que você forneceu
+    
+    template_path = 'emprestimos_export_pdf.html'  # Certifique-se de criar este template
     response = HttpResponse(content_type='application/pdf')
-    response['Content-Disposition'] = 'attachment; filename="clientes_contratos.pdf"'
-
+    response['Content-Disposition'] = 'attachment; filename="emprestimos.pdf"'
+    
     template = get_template(template_path)
     html = template.render(context)
-
+    
     pisa_status = pisa.CreatePDF(html, dest=response)
     if pisa_status.err:
         return HttpResponse(f'Erro ao gerar PDF: {pisa_status.err}')
-
+    
     return response
+
 
 @login_required
 def exportar_csv(request):
-    # Filtros da listagem de clientes
+    # Obter os empréstimos filtrados
+    emprestimos = filtrar_emprestimos(request)
+    
+    # Gera o CSV com base nos filtros aplicados
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="emprestimos.csv"'
+    
+    writer = csv.writer(response)
+    
+    # Cabeçalho do CSV
+    writer.writerow(['Cliente', 'Apelido', 'CPF', 'Contrato ID', 'Capital', 'Taxa de Juros', 'Juros', 'Total', 'Saldo Devedor', 'Data de Início', 'Data de Vencimento', 'Status'])
+    
+    # Loop pelos empréstimos filtrados
+    for emprestimo in emprestimos:
+        writer.writerow([
+            emprestimo.cliente.nome,
+            emprestimo.cliente.apelido,
+            emprestimo.cliente.cpf,
+            emprestimo.id,
+            float(emprestimo.capital),
+            float(emprestimo.taxa_juros),
+            float(emprestimo.calcular_valor_juros()),
+            float(emprestimo.valor_total),
+            float(emprestimo.saldo_devedor),
+            emprestimo.data_inicio.strftime("%d/%m/%Y"),
+            emprestimo.data_vencimento.strftime("%d/%m/%Y"),
+            emprestimo.get_status_display()
+        ])
+    
+    return response
+
+def filtrar_emprestimos(request):
+    user = request.user
+    user_group = user.groups.first()  # Grupo do usuário logado
+    
+    # Inicializar o queryset de empréstimos
+    emprestimos = Emprestimo.objects.all()
+    
+    # Se o usuário não for admin, filtrar por grupo e usuário
+    if not user.is_superuser:
+        emprestimos = emprestimos.filter(grupo=user_group, usuario=user)
+    
+    # Filtros de busca e status
     search_query = request.GET.get('search', None)
     grupo_filtrado = request.GET.get('grupo', None)
     usuario_filtrado = request.GET.get('usuario', None)
     status_filtrado = request.GET.get('status', None)
-    data_inicio = request.GET.get('data_inicio', None)
-    data_fim = request.GET.get('data_fim', None)
+    dias_semana = request.GET.get('dias_semana', None)
+    data_registro_inicio = request.GET.get('data_registro_inicio', None)
+    data_registro_fim = request.GET.get('data_registro_fim', None)
+    data_vencimento_inicio = request.GET.get('data_vencimento_inicio', None)
+    data_vencimento_fim = request.GET.get('data_vencimento_fim', None)
 
-    clientes_query = Cliente.objects.all()
+    # Aplicar filtros por grupo e usuário se for admin
+    if user.is_superuser:
+        if grupo_filtrado:
+            emprestimos = emprestimos.filter(grupo__name=grupo_filtrado)
+        if usuario_filtrado:
+            emprestimos = emprestimos.filter(usuario__username=usuario_filtrado)
     
-    # Pega todos os clientes do grupo do usuário logado, ou todos se for admin
-    if request.user.is_superuser:
-        clientes_query = Cliente.objects.all()
-    else:
-        clientes_query = Cliente.objects.filter(grupo=request.user.groups.first())
-        
-            # Aplica os filtros usando a função `aplicar_filtros`
-    clientes_query = aplicar_filtros(request, clientes_query)
-
+    # Filtro por status
+    if status_filtrado:
+        if status_filtrado == 'ativos':
+            emprestimos = emprestimos.filter(Q(status='ativo') | Q(status='NG') | Q(status='R'), saldo_devedor__gt=0)
+        elif status_filtrado == 'finalizados':
+            emprestimos = emprestimos.filter(status='finalizado', saldo_devedor=0)
+        elif status_filtrado == 'inadimplentes':
+            emprestimos = emprestimos.filter(status='inadimplentes')
+        elif status_filtrado == 'Renovados':
+            emprestimos = emprestimos.filter(status='R', saldo_devedor__gt=0)
+        elif status_filtrado == 'Negociados':
+            emprestimos = emprestimos.filter(status='NG')
+    
+    # Filtro por busca
     if search_query:
-        clientes_query = clientes_query.filter(
-            Q(nome__icontains=search_query) | 
-            Q(apelido__icontains=search_query) | 
-            Q(cpf__icontains=search_query) | 
-            Q(emprestimo__id__icontains=search_query)  # Adiciona busca por ID de empréstimo
+        emprestimos = emprestimos.filter(
+            Q(cliente__nome__icontains=search_query) |
+            Q(cliente__apelido__icontains=search_query) |
+            Q(cliente__cpf__icontains=search_query) |
+            Q(id__icontains=search_query)
         )
-
-
-    if grupo_filtrado:
-        clientes_query = clientes_query.filter(grupo__name=grupo_filtrado)
-
-    if usuario_filtrado:
-        clientes_query = clientes_query.filter(usuario__username=usuario_filtrado)
-
-    if status_filtrado == 'ativo':
-        clientes_query = clientes_query.filter(bloqueado=False)
-    elif status_filtrado == 'inativo':
-        clientes_query = clientes_query.filter(bloqueado=True)
-
-    if data_inicio and data_fim:
-        try:
-            data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d').date()
-            data_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
-            clientes_query = clientes_query.filter(data_registro__range=(data_inicio, data_fim))
-        except ValueError:
-            messages.error(request, 'Formato de data inválido. Use o formato AAAA-MM-DD.')
-
-    emprestimos_query = Emprestimo.objects.filter(cliente__in=clientes_query)
-
-    total_a_receber = round(sum(
-        emprestimo.capital * (emprestimo.taxa_juros / 100)
-        for emprestimo in emprestimos_query
-    ), 2)
-
-    total_juros_recebidos = round(sum(
-        emprestimo.total_juros_recebidos for emprestimo in emprestimos_query
-    ), 2)
-
-    total_geral = {
-        'total_clientes': clientes_query.count(),
-        'total_investido': round(emprestimos_query.aggregate(Sum('capital'))['capital__sum'] or 0, 2),
-        'total_recebido': round(emprestimos_query.aggregate(Sum('valor_total'))['valor_total__sum'] or 0, 2),
-        'total_a_receber': total_a_receber,
-        'total_juros_recebidos': total_juros_recebidos,
-        'total_emprestimos': emprestimos_query.count(),
-    }
-
-    # Gera o CSV com base nos filtros aplicados
-    response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = 'attachment; filename="clientes_com_contratos.csv"'
-
-    writer = csv.writer(response)
-
-    # Cabeçalho do CSV
-    writer.writerow(['Nome Cliente', 'Apelido', 'CPF', 'Data de Registro', 'Status', 
-                     'Contrato ID', 'Capital', 'Taxa de Juros', 'Juros', 'Total', 'Saldo Devedor', 
-                     'Data de Início', 'Data de Vencimento', 'Renovado', 'Data de Renovação'])
-
-    # Loop pelos clientes e seus contratos
-    for cliente in clientes_query:
-        contratos = Emprestimo.objects.filter(cliente=cliente)
-        for contrato in contratos:
-            writer.writerow([
-                cliente.nome,
-                cliente.apelido,
-                cliente.cpf,
-                cliente.data_registro.strftime("%d/%m/%Y"),
-                'Ativo' if not cliente.bloqueado else 'Inativo',
-                contrato.id,
-                contrato.capital,
-                contrato.taxa_juros,
-                contrato.calcular_valor_juros(),
-                contrato.valor_total,
-                contrato.saldo_devedor,
-                contrato.data_inicio.strftime("%d/%m/%Y"),
-                contrato.data_vencimento.strftime("%d/%m/%Y"),
-                'Sim' if contrato.renovado else 'Não',
-                contrato.data_renovacao.strftime("%d/%m/%Y H:%M") if contrato.renovado else 'N/A'
-            ])
-
-    # Adiciona os totais no final do CSV
-    writer.writerow([])
-    writer.writerow(['Totais Gerais:'])
-    writer.writerow(['Total Clientes:', total_geral['total_clientes']])
-    writer.writerow(['Total Investido:', total_geral['total_investido']])
-    writer.writerow(['Total Recebido:', total_geral['total_recebido']])
-    writer.writerow(['Total a Receber:', total_geral['total_a_receber']])
-    writer.writerow(['Total Juros Recebidos:', total_geral['total_juros_recebidos']])
-    writer.writerow(['Total Contratos:', total_geral['total_emprestimos']])
-
-    return response
-
+    
+    # Filtro por dias da semana
+    if dias_semana:
+        emprestimos = emprestimos.filter(dias_semana__icontains=dias_semana)
+    
+    # Filtro por datas de registro
+    if data_registro_inicio and data_registro_fim:
+        emprestimos = emprestimos.filter(data_inicio__range=[data_registro_inicio, data_registro_fim])
+    elif data_registro_inicio:
+        emprestimos = emprestimos.filter(data_inicio__gte=data_registro_inicio)
+    elif data_registro_fim:
+        emprestimos = emprestimos.filter(data_inicio__lte=data_registro_fim)
+    
+    # Filtro por datas de vencimento
+    if data_vencimento_inicio and data_vencimento_fim:
+        emprestimos = emprestimos.filter(data_vencimento__range=[data_vencimento_inicio, data_vencimento_fim])
+    elif data_vencimento_inicio:
+        emprestimos = emprestimos.filter(data_vencimento__gte=data_vencimento_inicio)
+    elif data_vencimento_fim:
+        emprestimos = emprestimos.filter(data_vencimento__lte=data_vencimento_fim)
+    
+    return emprestimos
 
 @login_required
 def home(request):
@@ -534,15 +486,19 @@ def home(request):
 
 
 @login_required
-@user_passes_test(lambda u: u.is_superuser)
 def cadastrar_cliente(request):
     if request.method == 'POST':
-        form = ClienteForm(request.POST, user=request.user)  # Passa o usuário ao formulário
+        form = ClienteForm(request.POST, user=request.user)
         if form.is_valid():
             cliente = form.save(commit=False)
-            # Atribui o grupo e o usuário ao cliente, caso seja admin
-            cliente.grupo = form.cleaned_data.get('grupo')
-            cliente.usuario = form.cleaned_data.get('usuario')
+            if request.user.is_superuser:
+                # Atribui o grupo e o usuário ao cliente, caso seja admin
+                cliente.grupo = form.cleaned_data.get('grupo')
+                cliente.usuario = form.cleaned_data.get('usuario')
+            else:
+                # Atribuir grupo e usuário do request
+                cliente.grupo = request.user.groups.first()
+                cliente.usuario = request.user
             cliente.save()
             
             # Verifica se o cliente tem empréstimos ativos
@@ -550,15 +506,17 @@ def cadastrar_cliente(request):
 
             # Define o status do relatório
             status_relatorio = 'NV' if not tem_emprestimo_ativo else 'Outro'
-            cliente.status_relatorio = status_relatorio  # Atualize o campo correspondente
+            cliente.status_relatorio = status_relatorio
 
             # Salva o cliente com o status atualizado
             cliente.save()
 
             messages.success(request, "Cliente cadastrado com sucesso!")
             return redirect('PELFCRED:lista_clientes')
+        else:
+            messages.error(request, "Por favor, corrija os erros abaixo.")
     else:
-        form = ClienteForm(user=request.user)  # Passa o usuário ao formulário
+        form = ClienteForm(user=request.user)
 
     return render(request, 'cadastrar_cliente.html', {'form': form})
 
@@ -604,7 +562,7 @@ def lista_emprestimos(request):
             emprestimos = emprestimos.filter(status='R', saldo_devedor__gt=0)
         elif status_filtrado == 'Negociados':   
             emprestimos = emprestimos.filter(status='NG')
-
+            
     # Filtro por busca (CPF, Nome, Apelido ou ID do contrato)
     if search_query:
         emprestimos = emprestimos.filter(
@@ -695,7 +653,8 @@ logger = logging.getLogger(__name__)
 
 @login_required
 def marcar_inadimplente(request, id_emprestimo):
-    logger.info(f"Tentando marcar o empréstimo {id_emprestimo} como inadimplente.")
+    print("View marcar_inadimplente chamada")
+    logger.info(f"View marcar_inadimplente chamada com id_emprestimo={id_emprestimo}")
     
     if request.method == 'POST':
         logger.info("Requisição POST recebida com sucesso.")
@@ -703,12 +662,28 @@ def marcar_inadimplente(request, id_emprestimo):
         try:
             emprestimo = get_object_or_404(Emprestimo, id=id_emprestimo)
             logger.info(f"Empréstimo {id_emprestimo} encontrado: {emprestimo}")
-            
+
+            # Calcular o valor dos juros
+            valor_juros = emprestimo.calcular_valor_juros()  # Certifique-se de que este método retorna o valor correto
+
+            # Atualizar o saldo devedor subtraindo os juros
+            emprestimo.saldo_devedor -= valor_juros
+            emprestimo.save()
+            logger.info(f"Saldo devedor atualizado para {emprestimo.saldo_devedor} após subtrair os juros de {valor_juros}.")
+
+            # Registrar a saída do valor dos juros como despesa (opcional)
+            Saida.objects.create(
+                emprestimo=emprestimo,
+                valor=valor_juros,
+                data_hora=timezone.now(),
+            )
+
+            # Atualizar o status do empréstimo para inadimplente
             emprestimo.status = 'inadimplentes'
             emprestimo.save()
             logger.info(f"Status do empréstimo {id_emprestimo} atualizado para inadimplentes.")
             
-            messages.success(request, 'Empréstimo marcado como inadimplente com sucesso.')
+            messages.success(request, 'Empréstimo marcado como inadimplente com sucesso. Juros descontados do saldo devedor.')
         except Exception as e:
             logger.error(f"Erro ao marcar o empréstimo {id_emprestimo} como inadimplente: {e}")
             messages.error(request, 'Ocorreu um erro ao tentar marcar o empréstimo como inadimplente.')
@@ -724,57 +699,69 @@ def marcar_inadimplente(request, id_emprestimo):
 def editar_emprestimo(request, id):
     emprestimo = get_object_or_404(Emprestimo, id=id)
     if request.method == 'POST':
-        form = EmprestimoForm(request.POST, instance=emprestimo)
+        form = EditarEmprestimoForm(request.POST, instance=emprestimo, user=request.user)
         if form.is_valid():
             emprestimo = form.save(commit=False)
-            emprestimo.valor_total_calculado = emprestimo.capital + (emprestimo.capital * emprestimo.taxa_juros / 100)
-            emprestimo.valor_parcelado = emprestimo.valor_total_calculado / emprestimo.numero_parcelas
+            # Recalcular o valor parcelado
+            emprestimo.valor_parcelado = emprestimo.valor_total / emprestimo.numero_parcelas
             emprestimo.save()
             messages.success(request, 'Contrato atualizado com sucesso.')
             return redirect('PELFCRED:lista_emprestimos')
         else:
             messages.error(request, f'Erro ao editar o contrato: {form.errors}')
     else:
-        form = EmprestimoForm(instance=emprestimo)
+        form = EditarEmprestimoForm(instance=emprestimo, user=request.user)
     
     return render(request, 'editar_emprestimo.html', {'form': form, 'emprestimo': emprestimo})
+
+
 @login_required
 def cadastrar_emprestimo(request, cpf=None):
     cliente = get_object_or_404(Cliente, cpf=cpf)
 
     if request.method == 'POST':
-        form = EmprestimoForm(request.POST)
+        form = EmprestimoForm(request.POST, user=request.user)
         if form.is_valid():
             emprestimo = form.save(commit=False)
             emprestimo.cliente = cliente  # Vincular o cliente ao empréstimo
-            emprestimo.grupo = request.user.groups.first()
-            emprestimo.usuario = request.user
-            
-            
-            # Definir o capital_inicial
+
+            if request.user.is_superuser:
+                # Se for admin, usamos os valores do formulário
+                emprestimo.grupo = form.cleaned_data.get('grupo')
+                emprestimo.usuario = form.cleaned_data.get('usuario')
+            else:
+                # Se não for admin, usamos o grupo e usuário do request
+                emprestimo.grupo = request.user.groups.first()
+                emprestimo.usuario = request.user
+
+            # Restante do código permanece igual
             emprestimo.capital_inicial = emprestimo.capital
-            
+
             # Processa os dias da semana selecionados
             dias_semana = form.cleaned_data.get('dias_semana', [])
             emprestimo.dias_semana = ','.join(dias_semana)
-            
+
             # Captura o número de parcelas corretamente
             emprestimo.numero_parcelas = form.cleaned_data['parcelas']
 
             # Calcula o valor total (capital + juros)
             emprestimo.valor_total = emprestimo.capital + (emprestimo.capital * emprestimo.taxa_juros / 100)
-            
+
             # Inicializa o saldo devedor com o valor total
             emprestimo.saldo_devedor = emprestimo.valor_total
 
             # Atribui o valor parcelado
             emprestimo.valor_parcelado = emprestimo.valor_total / emprestimo.numero_parcelas
-            
-            
+
             # Salva o empréstimo
             emprestimo.save()
-            
-            
+
+            # Criar um registro de saída com o capital inicial
+            Saida.objects.create(
+                emprestimo=emprestimo,
+                valor=emprestimo.capital_inicial,
+                data_hora=timezone.now()
+            )
 
             # Gerar as parcelas com base na frequência
             numero_parcelas = emprestimo.numero_parcelas
@@ -798,39 +785,37 @@ def cadastrar_emprestimo(request, cpf=None):
                     pago=False  # Inicialmente não pago
                 )
 
-            else:
-                messages.success(request, 'Empréstimo cadastrado com sucesso.')
-                logger.info("Redirecionando para lista de empréstimos.")
-                return redirect('PELFCRED:detalhes_cliente', cpf=cliente.cpf)
+            messages.success(request, 'Empréstimo cadastrado com sucesso.')
+            logger.info("Redirecionando para lista de empréstimos.")
+            return redirect('PELFCRED:detalhes_cliente', cpf=cliente.cpf)
         else:
             logger.error(f"Erro ao cadastrar o empréstimo: {form.errors}")
             messages.error(request, f'Erro ao cadastrar o empréstimo: {form.errors}')
     else:
-        form = EmprestimoForm(initial={'cliente': cliente})
+        form = EmprestimoForm(initial={'cliente': cliente}, user=request.user)
         logger.info("Formulário de empréstimo inicializado.")
-        
 
     return render(request, 'cadastrar_emprestimo.html', {'form': form, 'cliente': cliente})
+
 
 
 
 @login_required
 def renovar_emprestimo(request, id):
     emprestimo = get_object_or_404(Emprestimo, id=id)
-    
+
     if request.method == 'POST':
-        # Capturar os valores de entrada de forma segura
+        # Capturar os valores de entrada
         nova_taxa_juros_input = request.POST.get('nova_taxa_juros', '').strip()
         capital_adicional_input = request.POST.get('capital_adicional', '').strip()
         numero_parcelas_input = request.POST.get('parcelas', '').strip()
         frequencia = request.POST.get('frequencia')
-        
-        # Processar os dias da semana selecionados
-        dias_semana = request.POST.getlist('dias_semana')  # Captura como lista
-        dias_semana_str = ','.join(dias_semana)
-        emprestimo.dias_semana = dias_semana_str
 
-        # Validar e converter os valores para Decimal
+        # Processar os dias da semana selecionados
+        dias_semana = request.POST.getlist('dias_semana')
+        emprestimo.dias_semana = ','.join(dias_semana)
+
+        # Validar e converter os valores
         try:
             nova_taxa_juros = Decimal(nova_taxa_juros_input) if nova_taxa_juros_input else emprestimo.taxa_juros
             capital_adicional = Decimal(capital_adicional_input) if capital_adicional_input else Decimal('0')
@@ -841,28 +826,23 @@ def renovar_emprestimo(request, id):
 
         try:
             with transaction.atomic():
-                # Atualizar os campos do empréstimo atual
+                # Atualizar campos do empréstimo
                 emprestimo.numero_parcelas = numero_parcelas
                 emprestimo.frequencia = frequencia
-                
-                # Chamar o método renovar no modelo Emprestimo
+
+                # Chamar o método renovar
                 renovou = emprestimo.renovar(
                     nova_taxa_juros=nova_taxa_juros,
-                    capital_adicional=capital_adicional
+                    capital_adicional=capital_adicional,
                 )
-                
+
                 if renovou:
                     # Atualizar o status com base no capital adicional
-                    if capital_adicional > 0:
-                        emprestimo.status = 'R'  # Renovação
-                    else:
-                        emprestimo.status = 'NG'  # Negociação
+                    emprestimo.status = 'R' if capital_adicional > 0 else 'NG'
                     emprestimo.save()
-                    
+
                     logger.info(f"Empréstimo {emprestimo.id} renovado com sucesso por {request.user.username}.")
                     messages.success(request, 'Empréstimo renovado com sucesso!')
-                    
-                    # Redirecionar conforme o fluxo original
                     return redirect('PELFCRED:detalhes_cliente', cpf=emprestimo.cliente.cpf)
                 else:
                     logger.error(f"Falha na renovação do empréstimo {emprestimo.id} por {request.user.username}.")
@@ -880,20 +860,8 @@ def renovar_emprestimo(request, id):
         'capital_atual': emprestimo.capital,
         'dias_semana': emprestimo.dias_semana.split(',') if emprestimo.dias_semana else [],
     })
-@login_required
-def relatorio_emprestimos(request):
-    user_group = request.user.groups.first()
-    emprestimos_abertos = Emprestimo.objects.filter(grupo=user_group, saldo_devedor__gt=0)
-    emprestimos_quitados = Emprestimo.objects.filter(grupo=user_group, saldo_devedor=0)
 
-    context = {
-        'emprestimos_abertos': emprestimos_abertos,
-        'emprestimos_quitados': emprestimos_quitados,
-    }
-    return render(request, 'relatorio_emprestimos.html', context)
-
-
-@login_required
+    
 def excluir_emprestimo(request, id):
     emprestimo = get_object_or_404(Emprestimo, id=id)
     if request.method == 'POST':
@@ -914,24 +882,17 @@ def analisar_pagamentos(request):
     # Captura de parâmetros de filtro
     grupo_id = request.GET.get('grupo', None)
     usuario_id = request.GET.get('usuario', None)
-    
     search_query = request.GET.get('search', '')
     data_inicio = request.GET.get('data_inicio', '')
     data_fim = request.GET.get('data_fim', '')
     saldo_negativo = request.GET.get('saldo_negativo', '')
-    
+
     # Inicialização do queryset de pagamentos
     if request.user.is_superuser:
-        pagamentos = Pagamento.objects.all()  # Admin pode ver todos os pagamentos
+        pagamentos = Pagamento.objects.all()
     else:
-        pagamentos = Pagamento.objects.filter(usuario=request.user)  # Usuário comum vê apenas seus pagamentos
-    
-    # Calcular os totais de PIX e Dinheiro
-    total_pix = pagamentos.filter(tipo_pagamento='PIX').aggregate(Sum('valor_pago'))['valor_pago__sum'] or 0
-    total_dinheiro = pagamentos.filter(tipo_pagamento='DINHEIRO').aggregate(Sum('valor_pago'))['valor_pago__sum'] or 0
-        # Calcular o total de pagamentos filtrados
-    total_pagamentos = pagamentos.aggregate(total=Sum('valor_pago'))['total'] or 0
-    
+        pagamentos = Pagamento.objects.filter(usuario=request.user)
+
     # Aplicação dos filtros
     if search_query:
         pagamentos = pagamentos.filter(
@@ -950,13 +911,25 @@ def analisar_pagamentos(request):
         pagamentos = pagamentos.filter(data_pagamento__range=[data_inicio, data_fim])
 
     if saldo_negativo == '1':
-        # Filtrar os pagamentos que pertencem a empréstimos com saldo devedor negativo
         pagamentos = pagamentos.filter(emprestimo__saldo_devedor__lt=0)
 
+    # Calcular os totais após aplicar os filtros
+    total_pix = pagamentos.filter(tipo_pagamento='PIX').aggregate(Sum('valor_pago'))['valor_pago__sum'] or 0
+    total_dinheiro = pagamentos.filter(tipo_pagamento='DINHEIRO').aggregate(Sum('valor_pago'))['valor_pago__sum'] or 0
+    total_pagamentos = pagamentos.aggregate(total=Sum('valor_pago'))['total'] or 0
+    
+    # Calcular os totais de pagamentos usando o conjunto base de pagamentos
+    total_pix = pagamentos.aggregate(
+        total_pix=Sum('valor_pago', filter=Q(tipo_pagamento__iexact='PIX'))
+    )['total_pix'] or Decimal(0)
+
+    total_dinheiro = pagamentos.aggregate(
+        total_dinheiro=Sum('valor_pago', filter=Q(tipo_pagamento__iexact='DINHEIRO'))
+    )['total_dinheiro'] or Decimal(0)
 
 
     # Paginação
-    paginator = Paginator(pagamentos, 10)  # Mostra 10 pagamentos por página
+    paginator = Paginator(pagamentos, 10)
     page = request.GET.get('page')
 
     try:
@@ -970,7 +943,7 @@ def analisar_pagamentos(request):
         'pagamentos': pagamentos,
         'grupos': Group.objects.all(),
         'usuarios': User.objects.all(),
-        'total_pagamentos': total_pagamentos,  # Passa o total para o template
+        'total_pagamentos': total_pagamentos,
         'total_pix': total_pix,
         'total_dinheiro': total_dinheiro,
     }
@@ -993,31 +966,39 @@ def rejeitar_pagamento(request, pagamento_id):
                     'message': 'Você só pode rejeitar pagamentos feitos no dia de hoje.'
                 }, status=400)
 
-
             # Deleta o pagamento rejeitado
             pagamento.delete()
 
-            # Recalcular o total de juros recebidos após o pagamento ser rejeitado
+            # Recalcular o total pago e o saldo devedor
             total_pago = emprestimo.total_pago()
-            juros_recebido = max(0, total_pago - emprestimo.capital_inicial - emprestimo.capital_adicional)
+            emprestimo.saldo_devedor = emprestimo.calcular_saldo_devedor()
 
+            # Recalcular o total de juros recebidos após o pagamento ser rejeitado
+            total_investido = emprestimo.capital_inicial + emprestimo.capital_adicional_total
+            juros_recebido = max(Decimal('0.00'), total_pago - total_investido)
             emprestimo.total_juros_recebidos = juros_recebido
-            emprestimo.save()
 
             # Verifica se o status do empréstimo era 'finalizado' e restaura o status anterior, se houver
             if emprestimo.status == 'finalizado' and emprestimo.status_anterior:
                 emprestimo.status = emprestimo.status_anterior  # Restaura o status anterior
                 emprestimo.status_anterior = None  # Limpa o campo status_anterior após a restauração
-                emprestimo.save()
+
+            # Atualiza o status para 'inadimplente' se necessário
+            if emprestimo.saldo_devedor > 0 and emprestimo.status != 'inadimplentes':
+                emprestimo.status = 'inadimplentes'
+
+            # Salva as alterações no empréstimo
+            emprestimo.save()
 
             # Retorna uma resposta de sucesso em JSON
-            return JsonResponse({'success': True, 'message': 'Pagamento rejeitado, juros atualizados e status do empréstimo restaurado.'})
+            return JsonResponse({'success': True, 'message': 'Pagamento rejeitado, juros atualizados e saldo devedor recalculado.'})
 
         except Exception as e:
             logger.error(f"Erro ao rejeitar pagamento: {e}")
             return JsonResponse({'success': False, 'message': 'Erro ao rejeitar o pagamento.'}, status=500)
 
     return JsonResponse({'success': False, 'message': 'Método não permitido.'}, status=405)
+
 
 
 
@@ -1097,12 +1078,13 @@ def registrar_pagamento(request, id_emprestimo=None):
             total_pago_atualizado = valor_pago_total + valor_pago
             
             # Atualizar o saldo devedor
-            emprestimo.saldo_devedor = emprestimo.calcular_saldo_devedor()
+            saldo_devedor_atual = emprestimo.calcular_saldo_devedor()
+            emprestimo.saldo_devedor = saldo_devedor_atual
             emprestimo.save()
             logger.debug(f"Empréstimo {emprestimo.id}: Saldo devedor após pagamento: {emprestimo.saldo_devedor}")
             
-            # Verifica se o total pago é maior ou igual ao valor total do empréstimo
-            if total_pago_atualizado >= emprestimo.valor_total:
+            # Verifica se o saldo devedor está realmente zerado antes de finalizar
+            if saldo_devedor_atual <= Decimal('0.00'):
                 # Salvar o status anterior antes de finalizar
                 emprestimo.status_anterior = emprestimo.status  # Salva o status atual
                 emprestimo.status = 'finalizado'  # Muda para 'finalizado'
@@ -1120,10 +1102,6 @@ def registrar_pagamento(request, id_emprestimo=None):
             # Atualizar o campo de juros recebidos
             emprestimo.total_juros_recebidos = juros_recebido
             emprestimo.save()
-                
-            # Verifica se o empréstimo deve ser finalizado
-            if total_pago_atualizado >= emprestimo.valor_total:
-                emprestimo.verificar_finalizacao()
             
             messages.success(request, 'Pagamento registrado com sucesso!')
             return redirect('PELFCRED:detalhes_cliente', cpf=emprestimo.cliente.cpf)
@@ -1136,7 +1114,6 @@ def registrar_pagamento(request, id_emprestimo=None):
         'valor_pago_total': valor_pago_total,  # Exibe o total pago até agora
         'saldo_devedor': saldo_devedor,  # Exibe o saldo devedor correto
     })
-
     
 @login_required
 def finalizar_contrato(request, id_emprestimo):
@@ -1150,8 +1127,9 @@ def finalizar_contrato(request, id_emprestimo):
         messages.error(request, "O contrato não pode ser finalizado. O valor total ainda não foi pago.")
         return redirect('PELFCRED:detalhes_cliente', cpf=emprestimo.cliente.cpf)
 
+
     # Calcular os juros recebidos
-    juros_recebido = max(0, total_pago - emprestimo.capital_inicial - emprestimo.capital_adicional)
+    juros_recebido = max(0, total_pago - emprestimo.capital_inicial + emprestimo.capital_adicional)
     
     # Atualizar o campo de juros recebidos
     emprestimo.total_juros_recebidos = juros_recebido
@@ -1185,15 +1163,16 @@ def totais(request):
     data_inicio = request.GET.get('data_inicio', '')
     data_fim = request.GET.get('data_fim', '')
     status_filtro = request.GET.get('status', 'NV')
+    
 
     # Obtenção do usuário atual e seu grupo
     user = request.user
     grupo = user.groups.first()
 
-    # Definir se o usuário é administrador
+    # Define se o usuário é administrador
     admin_view = user.is_superuser or user.groups.filter(name='admin').exists()
 
-    # Validação de datas
+   # Validação de datas
     try:
         data_inicio_datetime = None
         data_fim_datetime = None
@@ -1215,11 +1194,11 @@ def totais(request):
         data_inicio, data_fim = None, None
         data_inicio_datetime, data_fim_datetime = None, None
 
-    # Inicializar as queries
+    # Inicializa as queries
     clientes = Cliente.objects.all()
     emprestimos = Emprestimo.objects.all()
     pagamentos = Pagamento.objects.all()
-    
+
     # Aplicar filtros de visualização (grupo, usuário)
     if not admin_view:
         clientes = clientes.filter(grupo=grupo, usuario=user)
@@ -1235,10 +1214,8 @@ def totais(request):
             emprestimos = emprestimos.filter(cliente__usuario__username=usuario_filtrado)
             pagamentos = pagamentos.filter(emprestimo__cliente__usuario__username=usuario_filtrado)
 
-    # Salvar os conjuntos de dados base para os totais
-    clientes_base = clientes
-    emprestimos_base = emprestimos
-    pagamentos_base = pagamentos
+    # Inicializar 'total_capital' com zero
+    total_capital = Decimal('0.00')
 
     # Aplicação dos filtros de data
     if data_inicio_datetime and data_fim_datetime:
@@ -1262,12 +1239,11 @@ def totais(request):
             Q(data_renovacao__lte=data_fim_datetime)
         )
         pagamentos = pagamentos.filter(data_pagamento__lte=data_fim_datetime)
-        
-            # Aplicação dos filtros por data de status e pagamentos
+
+    # Aplicação dos filtros por data de status e pagamentos
     if data_inicio and data_fim:
         emprestimos = emprestimos.filter(Q(data_inicio__gte=data_inicio) & Q(data_vencimento__lte=data_fim))
         pagamentos = pagamentos.filter(Q(data_pagamento__date__range=[data_inicio, data_fim]))
-        emprestimos_query = emprestimos_query.filter(data_inicio__range=[data_inicio, data_fim])
 
     # Filtrar clientes pelo status do relatório
     if status_filtro:
@@ -1281,11 +1257,10 @@ def totais(request):
     # Obter todos os empréstimos relevantes para o cálculo de total_investido
     emprestimos_todos = emprestimos_base.filter(status__in=['ativo', 'R', 'NG', 'AC', 'inadimplentes', 'finalizado'])
 
-
     # Anotar o capital total (capital_inicial + capital_adicional_total)
     emprestimos_todos = emprestimos_todos.annotate(
         capital_total=ExpressionWrapper(
-            F('capital_inicial') + F('capital_adicional_total'),
+            F('capital_inicial') - F('capital_adicional_total'),
             output_field=DecimalField()
         )
     )
@@ -1299,6 +1274,30 @@ def totais(request):
     emprestimos = emprestimos.filter(
         status__in=['R', 'NG', 'inadimplentes', 'finalizado', 'ativo']
     )
+    
+    if data_inicio_datetime and data_fim_datetime:
+        emprestimos = emprestimos.annotate(
+            total_capital=Sum(
+                'saidas__valor',
+                filter=Q(saidas__data_hora__range=(data_inicio_datetime, data_fim_datetime))
+            ),
+            
+            lucro=Sum(
+            'jurosrecebidos__valor',
+            filter=Q(jurosrecebidos__data_hora__range=(data_inicio_datetime, data_fim_datetime))
+        )
+        )   
+    else:
+        emprestimos = emprestimos.annotate(
+            total_capital=Sum('saidas__valor'),
+            lucro=Sum('jurosrecebidos__valor')  # Atualizado com o novo related_name
+        )
+    # Calcular o total de juros recebidos antes do desconto dos inadimplentes
+    total_juros_recebidos = emprestimos.aggregate(
+        total=Sum('lucro')
+    )['total'] or Decimal('0.00')
+
+
 
     # Atualizar os pagamentos com base nos empréstimos filtrados para exibição
     pagamentos = pagamentos.filter(emprestimo__in=emprestimos)
@@ -1321,17 +1320,17 @@ def totais(request):
     total_nv = clientes_base.filter(status_relatorio='NV').count()
     total_nvc = emprestimos_base.filter(status='ativo').count()
     total_ng = emprestimos_base.filter(status='NG').count()
-    total_r = emprestimos_base.filter(status='R', capital__gt=0).count()
+    total_r = emprestimos_base.filter(status='R').count()
     total_ac = emprestimos_base.filter(status='finalizado').count()
 
     # Calcular inadimplentes usando o conjunto base de empréstimos
     total_inadimplentes = emprestimos_base.filter(status='inadimplentes').count()
-    
+
     total_amarelo = emprestimos_base.filter(
         Q(data_vencimento__lt=timezone.now().date() - timedelta(days=29)) &
         Q(data_vencimento__gte=timezone.now().date() - timedelta(days=59))
     ).count()
-    
+
     total_vermelho = emprestimos_base.filter(
         Q(data_vencimento__lt=timezone.now().date() - timedelta(days=59))
     ).count()
@@ -1341,33 +1340,124 @@ def totais(request):
         total=Sum('capital_total')
     )['total'] or Decimal(0)
 
+    # Calcular total de saídas (capital) dentro do intervalo de datas
+    # Importação adicionada aqui
+
+    if data_inicio_datetime and data_fim_datetime:
+        saidas = Saida.objects.filter(
+            data_hora__range=[data_inicio_datetime, data_fim_datetime]
+        )
+    elif data_inicio_datetime:
+        saidas = Saida.objects.filter(
+            data_hora__gte=data_inicio_datetime
+        )
+    elif data_fim_datetime:
+        saidas = Saida.objects.filter(
+            data_hora__lte=data_fim_datetime
+        )
+    else:
+        saidas = Saida.objects.all()
+
+    # Aplicar filtros de grupo e usuário nas saídas
+    if not admin_view:
+        saidas = saidas.filter(emprestimo__grupo=grupo, emprestimo__usuario=user)
+    else:
+        if grupo_filtrado:
+            saidas = saidas.filter(emprestimo__grupo__name=grupo_filtrado)
+        if usuario_filtrado:
+            saidas = saidas.filter(emprestimo__usuario__username=usuario_filtrado)
+
+    # Calcular total_capital a partir das saídas
+    total_capital = (saidas.aggregate(total=Sum('valor'))['total'] or Decimal('0.00'))
+
     totais_financeiros = {
-        'total_capital': total_investido,
+        'total_capital': total_capital,
         'total_saldo_devedor': emprestimos_base.aggregate(total=Sum('saldo_devedor'))['total'] or Decimal(0),
     }
 
-    # Calcular o total de juros recebidos
-    total_juros_recebidos = emprestimos_todos.aggregate(
-        total=Sum('total_juros_recebidos')
-    )['total'] or Decimal(0)
+    # Obter os empréstimos inadimplentes e anotar o valor dos juros
+    emprestimos_inadimplentes = emprestimos.filter(status='inadimplentes').annotate(
+        valor_juros=ExpressionWrapper(
+            F('capital') * F('taxa_juros') / 100,
+            output_field=DecimalField(max_digits=10, decimal_places=2)
+        )
+    )
+
+    # Calcular o total dos juros dos inadimplentes
+    total_juros_inadimplentes = emprestimos_inadimplentes.aggregate(
+        total=Sum('valor_juros')
+    )['total'] or Decimal('0.00')
+
+    # Atualizar o total de juros recebidos subtraindo os juros dos inadimplentes
+    total_juros_recebidos = total_juros_recebidos - total_juros_inadimplentes
+
+    # Obter o valor total dos inadimplentes
+    total_inadimplentes_valor = emprestimos_inadimplentes.aggregate(
+        total=Sum('saldo_devedor')
+    )['total'] or Decimal('0.00')
+
 
     # Cálculo do total geral
-
     total_geral = {
-
+        'emprestimos_inadimplentes': emprestimos_inadimplentes,
         'total_clientes': clientes_base.count(),
+        'total_inadimplentes_valor': total_inadimplentes_valor,
+        'total_juros_inadimplentes': total_juros_inadimplentes,
+        'total_juros_recebidos': total_juros_recebidos,
         'total_emprestimos': emprestimos_base.count(),
         'total_investido': total_investido,
         'total_juros_recebidos': total_juros_recebidos,
     }
 
+     # Processar o formulário de desconto
+    if request.method == 'POST' and 'valor_desconto' in request.POST:
+        valor_desconto = request.POST.get('valor_desconto')
+        try:
+            valor_desconto = Decimal(valor_desconto)
+            if valor_desconto > 0:
+                # Salvar o desconto no banco de dados com a data atual
+                DescontoJuros.objects.create(
+                    valor=valor_desconto,
+                    data=timezone.now(),
+                    usuario=request.user,
+                    data_inicio=data_inicio_datetime,
+                    data_fim=data_fim_datetime
+                )
+                messages.success(request, 'Desconto aplicado com sucesso.')
+            else:
+                messages.error(request, 'O valor do desconto deve ser positivo.')
+        except (InvalidOperation, TypeError):
+            messages.error(request, 'Insira um valor numérico válido para o desconto.')
+
+    # Obter o histórico de descontos aplicados dentro do intervalo de datas filtrado
+    descontos = DescontoJuros.objects.all().order_by('-data')
+    if data_inicio_datetime and data_fim_datetime:
+        descontos = descontos.filter(data__range=[data_inicio_datetime, data_fim_datetime])
+
+    # Calcular o total de descontos aplicados
+    total_descontos = descontos.aggregate(total=Sum('valor'))['total'] or Decimal('0.00')
+
+    # Atualizar o total de juros recebidos subtraindo os descontos
+    total_juros_recebidos = total_juros_recebidos - total_descontos
+    
+    # Obter o histórico de descontos aplicados dentro do intervalo de datas filtrado
+    emprestimos_inadimplentes = emprestimos.filter(status='inadimplentes')
+
     # Contexto para o template
     contexto = {
+        'emprestimos_inadimplentes': emprestimos_inadimplentes,
+        'total_inadimplentes_valor': total_inadimplentes_valor,
+        'total_juros_inadimplentes': total_juros_inadimplentes,
         'today': now().date(),
+        'descontos': descontos,
+        'emprestimos_inadimplentes': emprestimos_inadimplentes,
+        'grupo': grupo,
+        'data_inicio': data_inicio,
+        'data_fim': data_fim,
         'total_juros_recebidos': total_juros_recebidos,
         'clientes': clientes,
-        'emprestimos': emprestimos,
         'emprestimos': emprestimos_base,
+        'emprestimos': emprestimos,
         'total_nv': total_nv,
         'total_ng': total_ng,
         'total_r': total_r,
@@ -1381,17 +1471,14 @@ def totais(request):
         'total_geral': total_geral,
         'grupo_filtrado': grupo_filtrado,
         'usuario_filtrado': usuario_filtrado,
-        'data_inicio': data_inicio,
-        'data_fim': data_fim,
         'grupos': Group.objects.all(),
         'usuarios': User.objects.all(),
         'total_pagamentos': total_pagamentos,
         'admin_view': admin_view,
         'data_hoje': date.today().strftime('%Y-%m-%d'),
         'status_list': ['R', 'NG', 'AC', 'NV', 'ativo'],  # Para uso no template
-        'total_nvc':total_nvc
+        'total_nvc': total_nvc
     }
-
     return render(request, 'totais.html', contexto)
 
 @login_required

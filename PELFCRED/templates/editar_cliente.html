@@ -211,4 +211,55 @@ document.addEventListener("DOMContentLoaded", function() {
     });
 });
 </script>
+{% if request.user.is_superuser %}
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        function updateUsuarios() {
+            var grupoSelect = document.getElementById('id_grupo');
+            var usuarioSelect = document.getElementById('id_usuario');
+            var grupoId = grupoSelect.value;
+
+            // Limpar as opções atuais do usuário
+            usuarioSelect.options.length = 0;
+
+            if (grupoId) {
+                fetch("{% url 'PELFCRED:ajax_load_usuarios' %}?grupo_id=" + grupoId)
+                .then(response => response.json())
+                .then(data => {
+                    var usuarios = data.usuarios;
+
+                    // Adiciona a opção vazia
+                    var optionEmpty = document.createElement('option');
+                    optionEmpty.value = "";
+                    optionEmpty.text = "Selecione um usuário";
+                    usuarioSelect.add(optionEmpty);
+
+                    usuarios.forEach(function(usuario) {
+                        var option = document.createElement('option');
+                        option.value = usuario.id;
+                        option.text = usuario.username;
+                        usuarioSelect.add(option);
+                    });
+                });
+            } else {
+                // Se nenhum grupo foi selecionado
+                var optionEmpty = document.createElement('option');
+                optionEmpty.value = "";
+                optionEmpty.text = "Selecione um grupo primeiro";
+                usuarioSelect.add(optionEmpty);
+            }
+        }
+
+        // Listener para o campo grupo
+        var grupoSelect = document.getElementById('id_grupo');
+        grupoSelect.addEventListener('change', updateUsuarios);
+
+        // Atualizar usuários ao carregar a página, se um grupo já estiver selecionado
+        if (grupoSelect.value) {
+            updateUsuarios();
+        }
+    });
+</script>
+{% endif %}
+
 {% endblock %}

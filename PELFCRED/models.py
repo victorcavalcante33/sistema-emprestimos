@@ -55,7 +55,16 @@ def clean(self):
     if Cliente.objects.filter(nome=self.nome).exclude(cpf=self.cpf).exists():
         raise ValidationError('Já existe um cliente com este nome.')
     
+class DescontoJuros(models.Model):
+    valor = models.DecimalField(max_digits=10, decimal_places=2)
+    data = models.DateTimeField(auto_now_add=True)
+    usuario = models.ForeignKey(User, on_delete=models.CASCADE)
+    data_inicio = models.DateTimeField(null=True, blank=True)
+    data_fim = models.DateTimeField(null=True, blank=True)
 
+    def __str__(self):
+        return f"{self.valor} em {self.data.strftime('%d/%m/%Y %H:%M')}"
+    
 
 logger = logging.getLogger(__name__)
 class Emprestimo(models.Model):
@@ -118,6 +127,7 @@ class Emprestimo(models.Model):
     juros_recebidos = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal(0))
     total_juros_recebidos = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal(0))
     dias_semana = models.CharField(max_length=100, blank=True, null=True)
+    
     
     STATUS_CHOICES = [
         ('ativo', 'Ativo'),
@@ -189,23 +199,38 @@ class Emprestimo(models.Model):
             logger.error(f"Erro ao calcular saldo devedor para empréstimo {self.id}: {e}")
             return Decimal(0)
         
+    import logging
+    logger = logging.getLogger(__name__)
     def renovar(self, nova_taxa_juros=None, capital_adicional=0):
         try:
             if nova_taxa_juros is None:
                 nova_taxa_juros = self.taxa_juros
 
-            # Calcula os juros já acumulados antes da renovação
-            juros_acumulados_anteriores = self.calcular_juros(imediato=True)
+            # Calcula os juros acumulados não recebidos até o momento
+            juros_acumulados_anteriores = self.calcular_juros()
 
             # Atualiza o total de juros recebidos
             self.total_juros_recebidos += juros_acumulados_anteriores
 
-            # **Atualiza o capital adicional total investido**
-            self.capital_adicional_total += capital_adicional
+            # Registra o lucro (juros recebidos)
+            JurosRecebido.objects.create(
+                emprestimo=self,
+                valor=juros_acumulados_anteriores,
+                data_hora=timezone.now()
+            )
 
-            # **Calcula o capital para a renovação atual**
-            # O capital da renovação é o saldo devedor atual (não pago) sem somar o capital adicional anterior
-            saldo_atual = self.calcular_saldo_devedor()
+            # Atualiza o capital adicional total
+            if capital_adicional > 0:
+                self.capital_adicional_total += capital_adicional
+                # Cria um registro de saída para o capital adicional
+                Saida.objects.create(
+                    emprestimo=self,
+                    valor=capital_adicional,
+                    data_hora=timezone.now()
+                )
+
+            # Calcula o novo capital (saldo devedor atual + capital adicional)
+            saldo_atual = self.saldo_devedor
             self.capital = saldo_atual + capital_adicional
 
             # Atualiza a taxa de juros
@@ -215,13 +240,12 @@ class Emprestimo(models.Model):
             novos_juros = self.capital * (nova_taxa_juros / 100)
             self.valor_total = self.capital + novos_juros
 
-            # O saldo devedor é o valor total, pois estamos renovando o empréstimo
+            # Atualiza o saldo devedor
             self.saldo_devedor = self.valor_total
 
             # Atualiza as datas
             self.data_inicio = timezone.now()
-            self.data_renovacao = self.data_inicio
-            self.renovado = True
+            self.data_renovacao = None  # Reiniciamos a data de renovação
 
             # Salva as alterações
             self.save()
@@ -241,33 +265,42 @@ class Emprestimo(models.Model):
                     data_vencimento=data_vencimento,
                     pago=False
                 )
+
+            logger.debug(f"Empréstimo {self.id}: Renovado em {timezone.now().strftime('%d/%m/%Y %H:%M')}")
             return True
         except Exception as e:
             logger.error(f"Erro ao renovar empréstimo {self.id}: {e}")
             return False
 
 
-
-
-    def calcular_juros(self, imediato=False):
-        """Calcula os juros acumulados até o momento, ou de forma imediata se solicitado."""
-        # Se for uma renovação imediata, calcular os juros sem considerar o tempo
-        if imediato:
-            return self.capital * (self.taxa_juros / 100)
-
+    def calcular_juros(self):
+        """Calcula os juros acumulados não recebidos até o momento."""
+    # Determina a data de início para o cálculo dos juros
         if self.data_renovacao:
-            # Se houve renovação, calcular os juros até a data de renovação
-            tempo_decorrido = (self.data_renovacao.date() - self.data_inicio).days / 30
+            data_inicio_calculo = self.data_renovacao
         else:
-            # Se não houve renovação, calcular até hoje
-            tempo_decorrido = (timezone.now().date() - self.data_inicio).days / 30
+            data_inicio_calculo = self.data_inicio
+
+
+        # Calcula o tempo decorrido em meses
+        tempo_decorrido = (timezone.now().date() - data_inicio_calculo).days / 30
 
         taxa_juros_mensal = Decimal(self.taxa_juros) / Decimal(100)
         tempo_decorrido = Decimal(tempo_decorrido)
 
         # Calcula os juros acumulados com base no tempo decorrido
-        juros = self.capital * taxa_juros_mensal * tempo_decorrido
-        return juros
+        juros_acumulados = self.capital * taxa_juros_mensal * tempo_decorrido
+
+        # Subtrai os juros já recebidos desde a última renovação
+        juros_acumulados -= self.total_juros_recebidos
+
+        # Garante que o valor não seja negativo
+        if juros_acumulados < 0:
+            juros_acumulados = Decimal('0.00')
+
+        return juros_acumulados
+    
+
 
     def calcular_valor_total(self):
         """Calcula o valor total do empréstimo com base no capital e taxa de juros."""
@@ -281,6 +314,7 @@ class Emprestimo(models.Model):
 
     def calcular_valor_juros(self):
         """Calcula o valor dos juros acumulados"""
+        
         return self.valor_total - self.capital
 
         
@@ -314,4 +348,27 @@ class ComprovantePIX(models.Model):
     data_upload = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f'Comprovante de {self.usuario.username} - {self.data_upload.strftime("%Y-%m-%d")}'
+        return f'Comprovante de {self.usuario.username} - {self.data_upload.strftime("%d-%m-%Y")}'
+
+
+class Saida(models.Model):
+    emprestimo = models.ForeignKey(Emprestimo, on_delete=models.CASCADE, related_name='saidas')
+    valor = models.DecimalField(max_digits=10, decimal_places=2)
+    data_hora = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Saída de R$ {self.valor:.2f} em {self.data_hora.strftime('%d/%m/%Y %H:%M')} para o empréstimo {self.emprestimo.id}"
+    
+
+class JurosRecebido(models.Model):
+    emprestimo = models.ForeignKey(
+        Emprestimo,
+        on_delete=models.CASCADE,
+        related_name='jurosrecebidos'  # Alterado o related_name para evitar conflito
+    )
+    valor = models.DecimalField(max_digits=10, decimal_places=2)
+    data_hora = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Juros de R$ {self.valor:.2f} recebidos em {self.data_hora.strftime('%d/%m/%Y %H:%M')}"
+

@@ -41,6 +41,8 @@ urlpatterns = [
     path('marcar_inadimplente/<int:id_emprestimo>/', views.marcar_inadimplente, name='marcar_inadimplente'),
     path('login/', auth_views.LoginView.as_view(template_name='registration/login.html'), name='login'),
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
+    path('excluir_desconto/<int:desconto_id>/', views.excluir_desconto, name='excluir_desconto'),
+    path('ajax/load-usuarios/', views.load_usuarios, name='ajax_load_usuarios'),
 ]
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

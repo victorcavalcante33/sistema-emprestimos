@@ -5,18 +5,84 @@
 {% block content %}
 <div class="container">
     <h2 class="mb-4 text-primary"></h2>
-
     <!-- Botão para abrir o modal de filtros -->
-    <div class="d-flex mb-3">
+    <div class="d-flex justify-content-center mb-3">
         <button class="btn btn-primary me-2" type="button" data-bs-toggle="modal" data-bs-target="#filtrosModal">
             Filtros
         </button>
+        {% if user.is_superuser %}
+        <button class="btn btn-primary me-2" type="button" data-bs-toggle="modal" data-bs-target="#descontoJurosModal">
+            Descontar Lucro
+        </button>
+        {% endif %}
         <form method="GET" id="filterTodayForm" class="ms-2">
             <input type="hidden" name="data_inicio" value="{{ data_hoje }}">
             <input type="hidden" name="data_fim" value="{{ request.GET.data_fim }}">
-            <button type="submit" class="btn btn-secondary">Hoje</button>
+            <button type="submit" class="btn btn-primary">{{ data_hoje}}</button>
+            
         </form>
     </div>
+
+    
+    <!-- Modal de Desconto de Juros -->
+    <div class="modal fade" id="descontoJurosModal" tabindex="-1" aria-labelledby="descontoJurosModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Descontos</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form method="POST" id="descontoJurosForm">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="valor_desconto" class="form-label">Valor do Desconto:</label>
+                            <input type="number" name="valor_desconto" id="valor_desconto" class="form-control" required>
+                        </div>
+                        <div class="d-flex justify-content-center">
+                            <button type="submit" class="btn btn-primary mx-2">Aplicar Desconto</button>
+                            <button type="button" class="btn btn-secondary mx-2" data-bs-dismiss="modal">Cancelar</button>
+                        </div>
+                    </form>
+                    <hr>
+                    <h5 class="mt-4">Histórico de Descontos</h5>
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Valor</th>
+                                {% if user.is_superuser %}
+                                <th>Ações</th>
+                                {% endif %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for desconto in descontos %}
+                            <tr>
+                                <td>{{ desconto.data|date:"d/m/Y H:i" }}</td>
+                                <td>{{ desconto.valor|floatformat:2 }}</td>
+                                {% if user.is_superuser %}
+                                <td>
+                                    <form method="post" action="{% url 'PELFCRED:excluir_desconto' desconto.id %}" style="display:inline;">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Tem certeza que deseja excluir este desconto?');">Excluir</button>
+                                    </form>
+                                </td>
+                                {% endif %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
 
     <!-- Modal de Filtros -->
     <div class="modal fade" id="filtrosModal" tabindex="-1" aria-labelledby="filtrosModalLabel" aria-hidden="true">
@@ -57,9 +123,7 @@
                                         <div class="col-12">
                                             <label for="data_fim" class="form-label">Data Fim:</label>
                                             <input type="date" name="data_fim" id="data_fim" class="form-control form-control-sm" value="{{ data_fim|default:'' }}">
-                                        </div>
-                                        
-                                    </div>
+                                        </div>                                                                            </div>
                                     <div class="d-flex justify-content-center mt-4">
                                         <button type="submit" class="btn btn-primary mx-2">Aplicar</button>
                                         <button type="button" class="btn btn-secondary mx-2" onclick="limparFiltros()">Limpar</button>
@@ -73,7 +137,7 @@
         </div>
     </div>
     <!-- Exibição dos Totais de Atrasos -->
-    <div class="d-flex justify-content-around mb-4">
+    <div class="d-flex justify-content-center gap-4 mb-4">
         <div class="rounded-circle bg-warning d-flex align-items-center justify-content-center" style="width: 70px; height: 70px;" >
             <span class="text-white fw-bold">{{ total_amarelo }}</span>
         </div>
@@ -82,77 +146,93 @@
         </div>
     </div>
     <!-- Exibição dos Totais de Valores -->
-    <div class="table-responsive mb-4">
-        <table class="table table-bordered table-hover">
+    <div class="table-responsive mb-4 d-flex justify-content-center">
+        <table class="table table-bordered table-hover" style="max-width: 600px;">
             <thead class="table-light">
                 <tr>
+                    <th class="text-center">Descrição</th>
+                    <th class="text-center">Valor</th>
                 </tr>
             </thead>
             <tbody>
                 <tr>
-                    <td>Total Saída</td>
-                    <td class="text-end fw-bold" id="total-investido">{{ totais_financeiros.total_capital|default:'0'|floatformat:0 }}</td>
-                </tr>
-                <tr>
-                    <td>Total Entrada</td>
-                    <td class="text-end fw-bold" id="total-entrada">
-                        <div class="text-center mb-2">
-                            <strong class="mb-2 text-primary">PIX: </strong>
-                            <span class="valor-pago">{{ total_pix|floatformat:0 }}</span>
-                            <br>
-                            <strong class="mb-2 text-primary">Dinheiro: </strong>
-                            <span class="valor-pago">{{ total_dinheiro|floatformat:0 }}</span>
-                            <br>
-                            <strong class="mb-2 text-primary">Total: </strong>
-                            <span class="valor-pago">{{ total_pagamentos|floatformat:0 }}</span>
-                        </div>
+                    
+                    <td class="text-center text-danger">
+                        <a href="#" data-bs-toggle="modal" data-bs-target="#inadimplentesModal" class="text-danger">
+                            Total Inadimplentes
+                        </a>
+                    </td>
+                    <td class="text-end fw-bold">
+                        <a href="#" data-bs-toggle="modal" data-bs-target="#inadimplentesModal" class="text-danger">
+                            {{ total_inadimplentes_valor|floatformat:0 }}
+                        </a>
                     </td>
                 </tr>
                 <tr>
-                    <td>Lucro</td>
+                    <td class="text-center">Lucro</td>
                     <td class="text-end fw-bold">{{ total_juros_recebidos|floatformat:0 }}</td>
+                </tr>
+                <tr>
+                    <td class="text-center">Total Saída</td>
+                    <td class="text-end fw-bold" id="total-investido">{{ totais_financeiros.total_capital|floatformat:0|default:'0'|floatformat:0 }}</td>
+                </tr>
+                <tr>
+                    <td class="text-center">Total Entrada</td>
+                    <td class="text-end fw-bold" id="total-entrada">
+                        <div class="d-flex flex-column">
+                            <div class="mb-2">
+                                <span class="text-primary fw-bold">PIX:</span>
+                                <span class="valor-pago ms-2">{{ total_pix|floatformat:0 }}</span>
+                            </div>
+                            <div class="mb-2">
+                                <span class="text-primary fw-bold">Dinheiro:</span>
+                                <span class="valor-pago ms-2">{{ total_dinheiro|floatformat:0 }}</span>
+                            </div>
+                            <div>
+                                <span class="text-primary fw-bold">Total:</span>
+                                <span class="valor-pago ms-2">{{ total_pagamentos|floatformat:0 }}</span>
+                            </div>
+                        </div>
+                    </td>
                 </tr>
             </tbody>
         </table>
     </div>
 
-
-
     <!-- Exibição dos Totais de Status -->
-    <div class="table-responsive mb-4">
-        <table class="table table-bordered table-hover">
+    <div class="table-responsive mb-4 d-flex justify-content-center">
+        <table class="table table-bordered table-hover" style="max-width: 600px;">
             <thead class="table-light">
                 <tr>
                 </tr>
             </thead>
             <tbody>
                 <tr>
-                    <td class="text-end fw-bold align-middle text-center"><a href="#" data-bs-toggle="modal" data-bs-target="#clientesNovosModal">Clientes Novos</a></td>
-                    <td class="text-end fw-bold"><a href="#" data-bs-toggle="modal" data-bs-target="#clientesNovosModal">{{ total_nv }}</a></td>
+                    <td class="text-center fw-bold align-middle"><a href="#" data-bs-toggle="modal" data-bs-target="#clientesNovosModal">Clientes Novos</a></td>
+                    <td class="text-center fw-bold"><a href="#" data-bs-toggle="modal" data-bs-target="#clientesNovosModal">{{ total_nv }}</a></td>
                 </tr>
-                    <td class="text-end fw-bold text-danger align-middle text-center">Inadimplentes</td>
-                    <td class="text-end fw-bold text-danger" id="total-inadimplentes">{{ total_inadimplentes }}</td>
-                </tr>
-                <tr>
-                    <td>NV</td>
-                    <td class="text-end fw-bold" id="total-nvc">{{ total_nvc }}</td>
+                    <td class="text-center fw-bold text-danger align-middle">Inadimplentes</td>
+                    <td class="text-center fw-bold text-danger" id="total-inadimplentes">{{ total_inadimplentes }}</td>
                 </tr>
                 <tr>
-                    <td>NG</td>
-                    <td class="text-end fw-bold" id="total-ng">{{ total_ng }}</td>
+                    <td class="text-center">NV</td>
+                    <td class="text-center fw-bold" id="total-nvc">{{ total_nvc }}</td>
                 </tr>
                 <tr>
-                    <td>R</td>
-                    <td class="text-end fw-bold" id="total-r">{{ total_r }}</td>
+                    <td class="text-center">NG</td>
+                    <td class="text-center fw-bold" id="total-ng">{{ total_ng }}</td>
                 </tr>
                 <tr>
-                    <td>AC</td>
-                    <td class="text-end fw-bold" id="total-ac">{{ total_ac }}</td>
+                    <td class="text-center">R</td>
+                    <td class="text-center fw-bold" id="total-r">{{ total_r }}</td>
+                </tr>
+                <tr>
+                    <td class="text-center">AC</td>
+                    <td class="text-center fw-bold" id="total-ac">{{ total_ac }}</td>
                 </tr>
             </tbody>
         </table>
     </div>
-
     <!-- Tabela de Detalhes -->
     <div class="table-responsive">
         <table class="table table-striped">
@@ -161,11 +241,11 @@
                     <th>Status</th>
                     <th>Cliente</th>
                     <th>Contrato</th>
-                    <th>Total Saldo</th>
+                    <th>Saldo</th>
                     <th>Saída (Capital)</th>
                     <th>Lucro</th>
-                    <th>Total Pago</th>
-                    <th>Tipo de Pagamento</th>
+                    <th>Pagamento</th>
+                    <th>Tipo Pagamento</th>
                     <th>Grupo</th>
                     <th>Usuário</th>
                 </tr>
@@ -174,13 +254,13 @@
                 {% for emprestimo in emprestimos %}
                 <tr>
                     <td>
-                        {% if emprestimo.status == 'ativo' %}
+                        {% if emprestimo.status == 'ativo'%}
                             NV
                         {% elif emprestimo.status == 'finalizado' %}
                             AC
-                        {% elif emprestimo.status == 'R' %}
+                        {% elif emprestimo.status == R %}
                             R
-                        {% elif emprestimo.status == 'NG' %}
+                        {% elif emprestimo.status == NG %}
                             NG
                         {% else %}
                             {{ emprestimo.status }}
@@ -188,24 +268,29 @@
                     </td>
                    
                     <td>{{ emprestimo.cliente.apelido }}<div class="small">{{ emprestimo.cliente.nome }}</div></td>
-                                <td>{{ emprestimo.id }}</td>
-                                <td>{{ emprestimo.saldo_devedor|floatformat:0 }}</td>
-                                <td>{{ emprestimo.capital_adicional_total|floatformat:0 }}</td>
-                                <td>{{ emprestimo.total_juros_recebidos|floatformat:0 }}</td>
-                                <td>
-                                    {% for pagamento in emprestimo.pagamentos.all %}
-                                        {% if pagamento.data_pagamento.date == today %}
-                                            {{ pagamento.valor_pago|floatformat:0 }}<br>
-                                        {% endif %}
-                                    {% endfor %}
-                                </td>
-                                <td>
-                                    {% for pagamento in emprestimo.pagamentos.all %}
-                                        {% if pagamento.data_pagamento.date == today %}
-                                            {{ pagamento.tipo_pagamento|upper }}<br>
-                                        {% endif %}
-                                    {% endfor %}
-                                </td>                                                               
+                    <td>{{ emprestimo.id }}</td>
+                    <td>{{ emprestimo.saldo_devedor|floatformat:0 }}</td>
+                    <td>{{ emprestimo.total_capital|default:'0'|floatformat:0 }}</td>
+                    <td>{{ emprestimo.calcular_valor_juros|default:'0'|floatformat:0 }}</td>
+                    <td>
+                        {% for pagamento in emprestimo.pagamentos.all %}
+                            {% if pagamento.data_pagamento.date == today %}
+                                {{ pagamento.valor_pago|floatformat:0 }}<br>
+                                
+                            {% endif %}
+                        {% endfor %}
+                        
+                    </td>
+                    <td>
+                        {% for pagamento in emprestimo.pagamentos.all %}
+                        
+                            {% if pagamento.data_pagamento.date == today %}
+                            {{ pagamento.tipo_pagamento|upper }}<br>
+                            {% endif %}
+                        {% endfor %}
+                    </td>   
+                        
+                                                                                       
                                 <td>{{ emprestimo.grupo.name }}</td>
                                 <td>{{ emprestimo.usuario.username }}</td>
                             </tr>
@@ -246,6 +331,44 @@
         </div>
     </div>
 
+    <!-- Modal de Inadimplentes -->
+<div class="modal fade" id="inadimplentesModal" tabindex="-1" aria-labelledby="inadimplentesModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Histórico de Inadimplentes</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Contrato</th>
+                            <th>Cliente</th>
+                            <th>Data</th>
+                            <th>Valor Devido</th>
+                            <th>Juros</th>
+                            <th>Saldo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for emprestimo in emprestimos_inadimplentes %}
+                        <tr>
+                            <td>{{ emprestimo.id }}</td>
+                            <td>{{ emprestimo.cliente.nome }}</td>
+                            <td>{{ emprestimo.data_inicio|date:"d/m/Y" }}</td>
+                            <td>{{ emprestimo.capital|floatformat:2 }}</td>
+                            <td>{{ emprestimo.calcular_valor_juros|floatformat:2 }}</td>
+                            <td>{{ emprestimo.saldo_devedor|floatformat:2 }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
     <script>
         function limparFiltros() {
             var form = document.getElementById('filterForm');
@@ -264,6 +387,25 @@
 
             form.submit();
         }
+
+        $(document).ready(function() {
+            $('#descontoJurosForm').on('submit', function(e) {
+                e.preventDefault();
+                $.ajax({
+                    type: 'POST',
+                    url: '{% url "PELFCRED:totais" %}',
+                    data: $(this).serialize(),
+                    success: function(response) {
+                        // Atualize os valores na página aqui
+                        location.reload();
+                    },
+                    error: function(error) {
+                        alert('Erro ao aplicar o desconto.');
+                    }
+                });
+            });
+        });
+
     </script>
 </div>
 {% endblock %}

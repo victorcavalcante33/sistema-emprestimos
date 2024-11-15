@@ -23,10 +23,13 @@
                 <p><strong>ID:</strong> {{ emprestimo.id }}</p>
                 <p><strong>Capital:</strong> R$ {{ emprestimo.capital }}</p>
                 <p><strong>Taxa de Juros:</strong> {{ emprestimo.taxa_juros }}%</p>
+                <p><strong>Status:</strong> {{ emprestimo.status }}</p>
+                
                 <h3 class="mb-3">Valores</h3>
                 <p><strong>Valor Total:</strong> R$ {{ emprestimo.valor_total }}</p>
-                <p><strong>Valor Pago:</strong> R$ {{ valor_pago_total | floatformat:2 | default:"0,00" }}</p>
-                <p><strong>Saldo:</strong> R$ {{ saldo_devedor | floatformat:2  | default:"0,00" }}</p>
+                <p><strong>Valor Pago:</strong> R$ {{ emprestimo.valor_pago_total | floatformat:2 | default:"0,00" }}</p>
+                <p><strong>Saldo:</strong> R$ {{ emprestimo.saldo_devedor | floatformat:2  | default:"0,00" }}</p>
+                
             </div>
             <div class="col-12 col-md-4 mb-3">
                 <h3 class="mb-3">Datas</h3>

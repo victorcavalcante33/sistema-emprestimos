@@ -8,9 +8,8 @@
     <h3 class="text-primary">Pagamentos</h3>
         <!-- Total dos Pagamentos -->
         <div class="mb-2">
-            <strong class="mb-2 text-primary">PIX: </strong>
-            <span class="valor-pago">{{ total_pix|floatformat:0 }}</span>
-            <br>
+            <span class="text-primary fw-bold">PIX:</span>
+            <span class="valor-pago ms-2">{{ total_pix|floatformat:0 }}</span>            <br>
             <strong class="mb-2 text-primary">Dinheiro: </strong>
             <span class="valor-pago">{{ total_dinheiro|floatformat:0 }}</span>
             <br>
@@ -56,13 +55,6 @@
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="mb-2">
-                            <label for="saldo_negativo" class="form-label">Saldo</label>
-                            <select name="saldo_negativo" class="form-select form-select-sm">
-                                <option value="">Todos os Saldos</option>
-                                <option value="1" {% if request.GET.saldo_negativo == '1' %}selected{% endif %}>Saldos Negativos</option>
-                            </select>
-                        </div>
                         <div class="row g-2 mb-2">
                             <div class="col-6">
                                 <label for="data_inicio" class="form-label">Data Inicial</label>
@@ -88,32 +80,38 @@
         <table class="table table-sm align-middle">
             <thead class="table-light">
                 <tr>
+                    <th>Contrato</th>
                     <th>Cliente</th>
+                    <th>Pagamento</th>
+                    <th>Tipo</th>
+                    <th>Saldo</th>
+                    <th>Parcela/Valor</th>
+                    <th>Valor Total</th>
                     <th>Data</th>
                     <th>Hora</th>
-                    <th>Pagamento</th>
-                    <th>Tipo de Pagamento</th>
-                    <th>Saldo</th>
                     <th>Grupo</th>
                     <th>Usuário</th>
-                    <th>Contrato</th>
+                    <th>Status</th>
                     {% if is_admin %}<th></th>{% endif %}
                 </tr>
             </thead>
             <tbody>
                 {% for pagamento in pagamentos %}
                 <tr>
+                    <td class="align-middle">{{ pagamento.emprestimo.id }}</td>
                     <td class="align-middle">{{ pagamento.emprestimo.cliente.apelido }}<div class="small">{{ pagamento.emprestimo.cliente.nome }}</div></td>
-                    <td class="align-middle">{{ pagamento.data_pagamento|date:"d/m/Y" }}</td>
-                    <td class="align-middle">{{ pagamento.data_pagamento|date:"H:i" }}</td>
                     <td class="small align-middle {% if pagamento.valor_pago > 0 %}valor-pago{% elif pagamento.valor_pago < 0 %}valor-negativo{% endif %}">{{ pagamento.valor_pago|floatformat:0|default:"" }}</td>
                     <td class="align-middle">{{ pagamento.tipo_pagamento|upper }}</td>
-                    <td class="align-middle {% if pagamento.emprestimo.calcular_saldo_devedor < 0 %}valor-negativo{% else %}valor-devido{% endif %} small">
-                        {{ pagamento.emprestimo.calcular_saldo_devedor|floatformat:0|default:"0.00" }}
+                    <td class="align-middle {% if pagamento.emprestimo.saldo_devedor < 0 %}valor-negativo{% else %}valor-devido{% endif %} small">
+                        {{ pagamento.emprestimo.saldo_devedor|floatformat:0|default:"0.00" }}
                     </td>
+                    <td class="align-middle">{{ pagamento.emprestimo.numero_parcelas|floatformat:0 }}x{{ pagamento.emprestimo.valor_parcelado|floatformat:0 }}</td>
+                    <td class="align-middle">{{ pagamento.emprestimo.valor_total|floatformat:0 }}</td>
+                    <td class="align-middle">{{ pagamento.data_pagamento|date:"d/m/Y" }}</td>
+                    <td class="align-middle">{{ pagamento.data_pagamento|date:"H:i" }}</td>
                     <td class="align-middle">{{ pagamento.emprestimo.grupo.name }}</td>
                     <td class="align-middle">{{ pagamento.emprestimo.usuario.username }}</td>
-                    <td class="align-middle">{{ pagamento.emprestimo.id }}</td>
+                    <td class="align-middle">{{ pagamento.emprestimo.status|title }}</td>
                     {% if is_admin %}
                     <td>
 
@@ -131,7 +129,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="9" class="text-center small">Nenhum pagamento encontrado.</td>
+                    <td colspan="12" class="text-center small">Nenhum pagamento encontrado.</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -227,7 +225,7 @@
                         location.reload();
                     });
                 } else {
-                    Swal.fire('Erro', 'Pagamento não rejeitado, pagamentos apenas pode ser rejeitado no dia de hoje.', 'error');
+                    Swal.fire('Erro', 'Pagamento não rejeitado, pagamentos apenas pode ser rejeitado no dia de pagamento.', 'error');
                 }
             })
             .catch(error => {

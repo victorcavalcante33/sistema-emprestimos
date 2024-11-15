@@ -254,7 +254,7 @@
                     <td class="align-middle" >{{ emprestimo.taxa_juros|floatformat:0 }}%</td>
                     <td class="align-middle" >{{ emprestimo.calcular_valor_juros|floatformat:0}}</td>
                     <td class="align-middle" >{{ emprestimo.valor_total |floatformat:0}}</td>
-                    <td class="align-middle">{{ emprestimo.calcular_saldo_devedor|floatformat:0}}</td>
+                    <td class="align-middle">{{ emprestimo.saldo_devedor|floatformat:0}}</td>
                     <td class="align-middle">{{ emprestimo.data_vencimento|date:"d/m/Y" }}</td>
                     <td class="align-middle">{{ emprestimo.get_dias_semana_display|join:", " }}</td>
                     <td class="align-middle">{{ emprestimo.parcelas_info}}</td>

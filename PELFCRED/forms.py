@@ -14,24 +14,11 @@ class ClienteForm(forms.ModelForm):
     class Meta:
         model = Cliente
         fields = [
-            'cpf',
-            'cnpj',
-            'nome',
-            'apelido',
-            'documento',
-            'telefone',
-            'telefone2',
-            'vinculo_telefone2',
-            'cep',
-            'endereco',
-            'numero_endereco',
-            'bairro',
-            'complemento', 
-            'uf', 
-            'cidade', 
-            'email',
-            'grupo',
-        ]    
+            'nome', 'apelido', 'cpf', 'cnpj', 'documento', 'email',
+            'telefone', 'telefone2', 'vinculo_telefone2', 'cep',
+            'endereco', 'numero_endereco', 'uf', 'cidade', 'bairro',
+            'complemento', 'grupo', 'usuario' 
+        ]
        
         error_messages = {
             'cpf': {
@@ -72,14 +59,36 @@ class ClienteForm(forms.ModelForm):
         widget=forms.TextInput()
     )
         
+    
     def __init__(self, *args, **kwargs):
-        self.user = kwargs.pop('user', None)  # Pega o usuário do kwargs, com valor padrão None
+        user = kwargs.pop('user', None)  # Captura o usuário dos kwargs
         super(ClienteForm, self).__init__(*args, **kwargs)
 
-        # Mostra grupo e usuário apenas se o usuário for admin
-        if self.user and not self.user.is_superuser:
-            self.fields['grupo'].widget = forms.HiddenInput()
-            self.fields['usuario'].widget = forms.HiddenInput()
+        if not user:
+            user = User.objects.none()  # Evita erro se user for None
+
+        if not user.is_superuser:
+            # Se o usuário não for admin, removemos os campos 'grupo' e 'usuario'
+            self.fields.pop('grupo', None)
+            self.fields.pop('usuario', None)
+        else:
+            # Se for admin, inicializamos 'usuario' com queryset vazio
+            self.fields['grupo'].queryset = Group.objects.all()
+            self.fields['usuario'].queryset = User.objects.none()
+
+            if 'grupo' in self.data:
+                try:
+                    grupo_id = int(self.data.get('grupo'))
+                    self.fields['usuario'].queryset = User.objects.filter(groups__id=grupo_id).order_by('username')
+                except (ValueError, TypeError):
+                    pass  # Se o grupo não for válido, mantemos o queryset vazio
+            elif self.instance.pk and self.instance.grupo:
+                # Se estivermos editando um cliente existente
+                self.fields['usuario'].queryset = User.objects.filter(groups__id=self.instance.grupo.id).order_by('username')
+
+            # Tornar os campos obrigatórios para administradores
+            self.fields['grupo'].required = True
+            self.fields['usuario'].required = True
         
         # Inicializa o CPF como readonly
         if self.instance and self.instance.pk:
@@ -159,7 +168,7 @@ class EmprestimoForm(forms.ModelForm):
     
     class Meta:
         model = Emprestimo
-        fields = ['cliente', 'capital', 'taxa_juros', 'data_inicio','dias_semana', 'frequencia', 'data_vencimento', 'parcelas', 'valor_parcelado', 'valor_total_calculado']
+        fields = ['cliente', 'capital', 'taxa_juros', 'data_inicio','dias_semana', 'frequencia', 'data_vencimento', 'parcelas', 'valor_parcelado', 'valor_total_calculado', 'grupo', 'usuario']
     data_inicio = forms.DateField(
         initial=date.today,  # Define a data de hoje como valor padrão
         widget=forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'})
@@ -193,8 +202,32 @@ class EmprestimoForm(forms.ModelForm):
         decimal_places=2,
         widget=forms.TextInput(attrs={'readonly': 'readonly'})
     )
-
     
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        super(EmprestimoForm, self).__init__(*args, **kwargs)
+
+        if not user.is_superuser:
+            # Se não for admin, removemos os campos 'grupo' e 'usuario'
+            self.fields.pop('grupo')
+            self.fields.pop('usuario')
+        else:
+            # Se for admin, inicializamos 'grupo' e 'usuario'
+            self.fields['grupo'].queryset = Group.objects.all()
+            self.fields['usuario'].queryset = User.objects.none()  # Inicialmente vazio
+
+            if 'grupo' in self.data:
+                try:
+                    grupo_id = int(self.data.get('grupo'))
+                    self.fields['usuario'].queryset = User.objects.filter(groups__id=grupo_id)
+                except (ValueError, TypeError):
+                    pass  # Se o grupo não for válido, mantemos o queryset vazio
+            elif self.instance.pk:
+                # Se estivermos editando um empréstimo existente
+                self.fields['usuario'].queryset = User.objects.filter(groups__id=self.instance.grupo.id)
+
+        self.fields['usuario'].required = True
+
 
     def clean_data_vencimento(self):
         data_inicio = self.cleaned_data.get('data_inicio')
@@ -220,7 +253,45 @@ class EmprestimoForm(forms.ModelForm):
         cleaned_data = super().clean()
         cleaned_data['data_vencimento'] = self.clean_data_vencimento()  # Calcula e adiciona data_vencimento a cleaned_data
         return cleaned_data
+    
+ 
+class EditarEmprestimoForm(forms.ModelForm):
+    class Meta:
+        model = Emprestimo
+        fields = ['data_inicio', 'numero_parcelas', 'data_vencimento', 'dias_semana', 'grupo', 'usuario']
+        
 
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        super(EditarEmprestimoForm, self).__init__(*args, **kwargs)
+
+        if not user:
+            user = User.objects.none()
+
+        if not user.is_superuser:
+            # Se o usuário não for admin, removemos os campos 'grupo' e 'usuario'
+            self.fields.pop('grupo', None)
+            self.fields.pop('usuario', None)
+        else:
+            # Se for admin, inicializamos 'usuario' com queryset vazio
+            self.fields['grupo'].queryset = Group.objects.all()
+            self.fields['usuario'].queryset = User.objects.none()
+
+            if 'grupo' in self.data:
+                try:
+                    grupo_id = int(self.data.get('grupo'))
+                    self.fields['usuario'].queryset = User.objects.filter(groups__id=grupo_id).order_by('username')
+                except (ValueError, TypeError):
+                    pass
+            elif self.instance.pk and self.instance.grupo:
+                # Ao editar um empréstimo existente
+                self.fields['usuario'].queryset = User.objects.filter(groups__id=self.instance.grupo.id).order_by('username')
+
+            # Tornar os campos obrigatórios
+            self.fields['grupo'].required = True
+            self.fields['usuario'].required = True
+            
+            
 class ComprovantePIXForm(forms.ModelForm):
     class Meta:
         model = ComprovantePIX

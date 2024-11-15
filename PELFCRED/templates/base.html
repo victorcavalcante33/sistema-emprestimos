@@ -73,9 +73,11 @@
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'PELFCRED:totais' %}"><i class="fas fa-chart-bar me-1"></i> Totais</a>
                     </li>
+                    {% if user.is_superuser %}
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'admin:index' %}"><i class="fas fa-cog me-1"></i></a>
                     </li>
+                    {% endif %}
                     <li class="nav-item">
                         <form method="post" action="{% url 'logout' %}">
                             {% csrf_token %}
@@ -113,6 +115,15 @@
                 });
             {% endfor %}
         {% endif %}
+
+        {% if messages %}
+<div class="container mt-3">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
     </script>
 </body>
 </html>

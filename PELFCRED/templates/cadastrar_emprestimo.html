@@ -32,7 +32,27 @@
                 </div>
             </div>
         </div>
-
+     <!-- Se o usuário for admin, exibimos os campos de Grupo e Usuário -->
+     {% if request.user.is_superuser %}
+     <div class="card mb-4 shadow-sm">
+         <div class="card-header bg-primary text-white">
+             <h5 class="mb-0">Grupo e Usuário</h5>
+         </div>
+         <div class="card-body">
+             <div class="row g-3">
+                 <div class="col-md-3">
+                     {{ form.grupo.label_tag }}
+                     {{ form.grupo }}
+                 </div>
+                 <div class="col-md-2">
+                     {{ form.usuario.label_tag }}
+                     {{ form.usuario }}
+                 </div>
+             </div>
+         </div>
+     </div>
+     
+     {% endif %}
         <div class="card mb-4 shadow-sm">
             <div class="card-header bg-primary text-white">
                 <h5 class="mb-0">Detalhes do Empréstimo</h5>
@@ -153,7 +173,62 @@
 
         // Inicializar o estado do select de semanas
         toggleSemanasSelect();
+
+    });
+
+
+</script>
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // Seus códigos existentes para cálculo de valores
+        // ...
+
+        {% if request.user.is_superuser %}
+        // Função para atualizar o campo de usuário
+        function updateUsuarios() {
+            var grupoSelect = document.getElementById('id_grupo');
+            var usuarioSelect = document.getElementById('id_usuario');
+            var grupoId = grupoSelect.value;
+
+            // Limpa as opções atuais do usuário
+            usuarioSelect.options.length = 0;
+
+            if (grupoId) {
+                fetch("{% url 'PELFCRED:ajax_load_usuarios' %}?grupo_id=" + grupoId)
+                .then(response => response.json())
+                .then(data => {
+                    var usuarios = data.usuarios;
+                    // Adiciona a opção vazia
+                    var optionEmpty = document.createElement('option');
+                    optionEmpty.value = "";
+                    optionEmpty.text = "";
+                    usuarioSelect.add(optionEmpty);
+
+                    usuarios.forEach(function(usuario) {
+                        var option = document.createElement('option');
+                        option.value = usuario.id;
+                        option.text = usuario.username;
+                        usuarioSelect.add(option);
+                    });
+                });
+            } else {
+                // Se nenhum grupo foi selecionado, adiciona a opção vazia
+                var optionEmpty = document.createElement('option');
+                optionEmpty.value = "";
+                optionEmpty.text = "";
+                usuarioSelect.add(optionEmpty);
+            }
+        }
+
+        // Adiciona o listener ao campo grupo
+        var grupoSelect = document.getElementById('id_grupo');
+        grupoSelect.addEventListener('change', updateUsuarios);
+
+        // Atualiza os usuários ao carregar a página, caso um grupo esteja selecionado
+        if (grupoSelect.value) {
+            updateUsuarios();
+        }
+        {% endif %}
     });
 </script>
-
 {% endblock %}
