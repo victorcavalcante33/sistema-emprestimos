@@ -1,0 +1,428 @@
+{% extends 'base.html' %}
+{% load custom_filters %}
+{% block title %}Totais Gerais{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2 class="mb-4 text-primary"></h2>
+    <!-- Botão para abrir o modal de filtros -->
+    <div class="d-flex justify-content-center mb-3">
+        <button class="btn btn-primary me-2" type="button" data-bs-toggle="modal" data-bs-target="#filtrosModal">
+            Filtros
+        </button>
+        {% if user.is_superuser %}
+        <button class="btn btn-primary me-2" type="button" data-bs-toggle="modal" data-bs-target="#descontoJurosModal">
+            Reserva
+        </button>
+        {% endif %}
+        <form method="GET" id="filterTodayForm" class="ms-2">
+            <input type="hidden" name="data_inicio" value="{{ data_hoje }}">
+            <input type="hidden" name="data_fim" value="{{ request.GET.data_fim }}">
+            <button type="submit" class="btn btn-primary">{{ data_hoje}}</button>
+            
+        </form>
+    </div>
+
+    
+    <!-- Modal de Desconto de Juros -->
+    <div class="modal fade" id="descontoJurosModal" tabindex="-1" aria-labelledby="descontoJurosModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form method="POST" id="descontoJurosForm">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <h5 class="modal-title">Reserva</h5></label>
+                            <input type="number" name="valor_desconto" id="valor_desconto" class="form-control" required>
+                        </div>
+                        <div class="d-flex justify-content-center">
+                            <button type="submit" class="btn btn-primary mx-2">Aplicar Desconto</button>
+                            <button type="button" class="btn btn-secondary mx-2" data-bs-dismiss="modal">Cancelar</button>
+                        </div>
+                    </form>
+                    <hr>
+                    <h5 class="mt-4"></h5>
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Valor</th>
+                                {% if user.is_superuser %}
+                                <th></th>
+                                {% endif %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for desconto in descontos %}
+                            <tr>
+                                <td>{{ desconto.data|date:"d/m/Y H:i" }}</td>
+                                <td>{{ desconto.valor|floatformat:2 }}</td>
+                                {% if user.is_superuser %}
+                                <td>
+                                    <form method="post" action="{% url 'PELFCRED_APP:excluir_desconto' desconto.id %}" style="display:inline;">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Tem certeza que deseja excluir este desconto?');">Excluir</button>
+                                    </form>
+                                </td>
+                                {% endif %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+    <!-- Modal de Filtros -->
+    <div class="modal fade" id="filtrosModal" tabindex="-1" aria-labelledby="filtrosModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Filtros</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form method="GET" id="filterForm">
+                        <div class="container-fluid">
+                            <div class="row justify-content-center">
+                                <div class="col-12 col-md-10">
+                                    <div class="row g-3">
+                                        {% if admin_view %}
+                                        <div class="col-12">
+                                            <select name="grupo" class="form-select form-select-sm">
+                                                <option value="">Todos os Grupos</option>
+                                                {% for grupo in grupos %}
+                                                    <option value="{{ grupo.name }}" {% if grupo.name == request.GET.grupo %}selected{% endif %}>{{ grupo.name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>                        
+                                        <div class="col-12">
+                                            <select name="usuario" class="form-select form-select-sm">
+                                                <option value="">Todos os Usuários</option>
+                                                {% for usuario in usuarios %}
+                                                    <option value="{{ usuario.username }}" {% if usuario.username == request.GET.usuario %}selected{% endif %}>{{ usuario.username }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>                        
+                                        {% endif %}
+                                        <div class="col-12">
+                                            <label for="data_inicio" class="form-label">Data Início:</label>
+                                            <input type="date" name="data_inicio" id="data_inicio" class="form-control form-control-sm" value="{{ data_inicio|default:'' }}">
+                                        </div>
+                                        <div class="col-12">
+                                            <label for="data_fim" class="form-label">Data Fim:</label>
+                                            <input type="date" name="data_fim" id="data_fim" class="form-control form-control-sm" value="{{ data_fim|default:'' }}">
+                                        </div>                                                                            </div>
+                                    <div class="d-flex justify-content-center mt-4">
+                                        <button type="submit" class="btn btn-primary mx-2">Aplicar</button>
+                                        <button type="button" class="btn btn-secondary mx-2" onclick="limparFiltros()">Limpar</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Exibição dos Totais de Atrasos -->
+    <div class="d-flex justify-content-center gap-4 mb-4">
+        <div class="rounded-circle bg-warning d-flex align-items-center justify-content-center" style="width: 70px; height: 70px;" >
+            <span class="text-white fw-bold">{{ total_amarelo }}</span>
+        </div>
+        <div class="rounded-circle bg-danger d-flex align-items-center justify-content-center" style="width: 70px; height: 70px;">
+            <span class="text-white fw-bold">{{ total_vermelho }}</span>
+        </div>
+    </div>
+    <!-- Exibição dos Totais de Valores -->
+    <div class="table-responsive mb-4 d-flex justify-content-center">
+        <table class="table table-bordered table-hover" style="max-width: 600px;">
+            <thead class="table-light">
+                <tr>
+                    <th class="text-center">Descrição</th>
+                    <th class="text-center">Valor</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="text-center text-danger">
+                        <a href="#" data-bs-toggle="modal" data-bs-target="#inadimplentesModal" class="text-danger">
+                            Total Inadimplentes
+                        </a>
+                    </td>
+                    <td class="text-end fw-bold">
+                        <a href="#" data-bs-toggle="modal" data-bs-target="#inadimplentesModal" class="text-danger">
+                            {{ total_inadimplentes_valor|floatformat:0 }}
+                        </a>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="text-center">Lucro</td>
+                    <td class="text-end fw-bold">{{ total_juros_recebidos|floatformat:0 }}</td>
+                </tr>
+                <tr>
+                    <td class="text-center">Bônus Juros</td>
+                    <td class="text-end fw-bold">{{ total_bonus_juros|floatformat:0 }}</td>
+                </tr>
+                <tr>
+                    <td class="text-center">Total Saída</td>
+                    <td class="text-end fw-bold" id="total-investido">{{ totais_financeiros.total_capital|floatformat:0|default:'0'|floatformat:0 }}</td>
+                </tr>
+                <tr>
+                    <td class="text-center">Total Reserva</td>
+                    <td class="text-end fw-bold">{{ total_descontos|floatformat:0 }}</td>
+                </tr>
+                <tr>
+                    <td class="text-center">Total Entrada</td>
+                    <td class="text-end fw-bold" id="total-entrada">
+                        <div class="d-flex flex-column">
+                            <div class="mb-2">
+                                <span class="text-primary fw-bold">PIX:</span>
+                                <span class="valor-pago ms-2">{{ total_pix|floatformat:0 }}</span>
+                            </div>
+                            <div class="mb-2">
+                                <span class="text-primary fw-bold">Dinheiro:</span>
+                                <span class="valor-pago ms-2">{{ total_dinheiro|floatformat:0 }}</span>
+                            </div>
+                            <div>
+                                <span class="text-primary fw-bold">Total:</span>
+                                <span class="valor-pago ms-2">{{ total_pagamentos|floatformat:0 }}</span>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Exibição dos Totais de Status -->
+    <div class="table-responsive mb-4 d-flex justify-content-center">
+        <table class="table table-bordered table-hover" style="max-width: 600px;">
+            <thead class="table-light">
+                <tr>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="text-center fw-bold align-middle"><a href="#" data-bs-toggle="modal" data-bs-target="#clientesNovosModal">Clientes Novos</a></td>
+                    <td class="text-center fw-bold"><a href="#" data-bs-toggle="modal" data-bs-target="#clientesNovosModal">{{ total_nv }}</a></td>
+                </tr>
+                    <td class="text-center fw-bold text-danger align-middle">Inadimplentes</td>
+                    <td class="text-center fw-bold text-danger" id="total-inadimplentes">{{ total_inadimplentes }}</td>
+                </tr>
+                <tr>
+                    <td class="text-center">NV</td>
+                    <td class="text-center fw-bold" id="total-nvc">{{ total_nvc }}</td>
+                </tr>
+                <tr>
+                    <td class="text-center">NG</td>
+                    <td class="text-center fw-bold" id="total-ng">{{ total_ng }}</td>
+                </tr>
+                <tr>
+                    <td class="text-center">R</td>
+                    <td class="text-center fw-bold" id="total-r">{{ total_r }}</td>
+                </tr>
+                <tr>
+                    <td class="text-center">AC</td>
+                    <td class="text-center fw-bold" id="total-ac">{{ total_ac }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <!-- Tabela de Detalhes -->
+    <div class="table-responsive">
+        <table class="table table-striped text-center">
+            <thead>
+                <tr>
+                    <th class="text-center"><strong>Status</strong></th>
+                    <th class="text-center"><strong>Cliente</strong></th>
+                    <th class="text-center"><strong>Contrato</strong></th>
+                    <th class="text-center"><strong>Saldo</strong></th>
+                    <th class="text-center"><strong>Saída</strong></th>
+                    <th class="text-center"><strong>Lucro</strong></th>
+                    <th class="text-center"><strong>Pagamento</strong></th>
+                    <th class="text-center"><strong>Usuário</strong></th>
+                    <th class="text-center"><strong>Grupo</strong></th>
+                </tr>
+            </thead>
+            <tbody class="align-middle text-center"> 
+                {% for emprestimo in emprestimos %}
+                <tr>
+                    <td>
+                        <strong>
+                        {% if emprestimo.status == 'ativo'%}
+                            <span style="color: #45B7D1">NV</span>
+                        {% elif emprestimo.status == 'finalizado' %}
+                            <span style="color: #4ECDC4">AC</span>
+                        {% elif emprestimo.status == R %}
+                            <span style="color: #45B7D1">R</span>
+                        {% elif emprestimo.status == NG %}
+                            <span style="color: #96CEB4">NG</span>
+                        {% else %}
+                            <span style="color: #D4A5A5">{{ emprestimo.status }}</span>
+                        {% endif %}
+                        </strong>
+                    </td>                   
+                    <td><strong>{{ emprestimo.cliente.apelido }}<div class="small">{{ emprestimo.cliente.nome }}</div></strong></td>
+                    <td><strong>{{ emprestimo.id }}</strong></td>
+                    <td><strong>{{ emprestimo.saldo_devedor|floatformat:0 }}</strong></td>
+                    <td><strong>{{ emprestimo.capital_renovacao|default:'0'|floatformat:0 }}</strong></td>
+                    <td>
+                        <strong>
+                        {% if emprestimo.status != 'ativo' and emprestimo.status != 'NV' %}
+                            {{ emprestimo.calcular_valor_juros|default:''|floatformat:0 }}
+                        {% else %}
+                            0
+                        {% endif %}
+                        </strong>
+                    </td>
+                    
+                    <td>
+                        {% for pagamento in emprestimo.pagamentos.all %}
+                            {% if pagamento.data_pagamento.date == today %}
+                            <strong>{{ pagamento.tipo_pagamento|upper }} <i class="fas fa-dollar-sign"></i>{{ pagamento.valor_pago|floatformat:0 }}</strong><br>
+                            <strong><i class="fas fa-clock"></i>{{ pagamento.data_pagamento|date:"H:i" }}</strong><br>                                
+                            {% endif %}
+                        {% endfor %}
+                    </td>
+                    <td><strong>{{ emprestimo.usuario.username }}</strong></td>                                                 
+                    <td><strong>{{ emprestimo.grupo.name }}</strong></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <!-- Modal de Clientes Novos -->
+    <div class="modal fade" id="clientesNovosModal" tabindex="-1" aria-labelledby="clientesNovosModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="clientesNovosModalLabel">Clientes Novos</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Nome</th>
+                                <th>Apelido</th>
+                                <th>Data de Cadastro</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for cliente in clientes %}
+                            <tr>
+                                <td>{{ cliente.nome }}</td>
+                                <td>{{ cliente.apelido }}</td>
+                                <td>{{ cliente.data_registro|date:"d/m/Y" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Inadimplentes -->
+<div class="modal fade" id="inadimplentesModal" tabindex="-1" aria-labelledby="inadimplentesModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Histórico de Inadimplentes</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Contrato</th>
+                            <th>Cliente</th>
+                            <th>Data</th>
+                            <th>Valor Devido</th>
+                            <th>Juros</th>
+                            <th>Saldo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for emprestimo in emprestimos_inadimplentes %}
+                        <tr>
+                            <td>{{ emprestimo.id }}</td>
+                            <td>{{ emprestimo.cliente.nome }}</td>
+                            <td>{{ emprestimo.data_inicio|date:"d/m/Y" }}</td>
+                            <td>{{ emprestimo.capital|floatformat:2 }}</td>
+                            <td>{{ emprestimo.calcular_valor_juros|floatformat:2 }}</td>
+                            <td>{{ emprestimo.saldo_devedor|floatformat:2 }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+    <script>
+        function limparFiltros() {
+            var form = document.getElementById('filterForm');
+            var inputs = form.getElementsByTagName('input');
+            var selects = form.getElementsByTagName('select');
+
+            for (var i = 0; i < inputs.length; i++) {
+                if (inputs[i].type === 'text' || inputs[i].type === 'date') {
+                    inputs[i].value = '';
+                }
+            }
+
+            for (var i = 0; i < selects.length; i++) {
+                selects[i].selectedIndex = 0;
+            }
+
+            form.submit();
+        }
+
+        $(document).ready(function() {
+            $('#descontoJurosForm').on('submit', function(e) {
+                e.preventDefault();
+
+                // Get the current GET parameters
+                var currentUrl = window.location.href;
+                var urlParts = currentUrl.split('?');
+                var getParams = '';
+                if (urlParts.length > 1) {
+                    getParams = '?' + urlParts[1];
+                }
+
+                $.ajax({
+                    type: 'POST',
+                    url: '{% url "PELFCRED_APP:totais" %}' + getParams,
+                    data: $(this).serialize(),
+                    success: function(response) {
+                        // Reload the page with current GET parameters
+                        window.location.href = window.location.href;
+                    },
+                    error: function(error) {
+                        alert('Erro ao aplicar o desconto.');
+                    }
+                });
+            });
+        });
+            });
+        });
+            });
+        });
+
+    </script>
+</div>
+{% endblock %}

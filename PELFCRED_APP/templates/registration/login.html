@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    {% load static %}
+    <title>Login - Sistema</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- Link para o CSS personalizado -->
+    <link rel="stylesheet" href="{% static 'PELFCRED/login.css' %}">
+    <link rel="icon" type="image/x-icon" href="{% static 'PELFCRED/favicon/favicon.ico' %}">
+</head>
+<body>
+
+    <div class="login-container">
+
+        <!-- Fundo do login (imagem) -->
+        <div class="frame-1-login">
+            <img src="{% static 'PELFCRED/telalogin/Frame1-login.png' %}" alt="Frame Login" class="frame-1-login-img">
+            <div class="titulo">
+                <h3>Bem Vindo!</h3>
+               
+            </div>
+            <!-- Formulário de Login sobreposto -->
+            <div class="form-container-login">
+                <form method="post" action="{% url 'PELFCRED_APP:login' %}">
+                    {% csrf_token %}
+                    {% if form.errors %}
+                        <div class="alert alert-danger">
+                            <strong> Usuário ou senha inválidos.</strong>
+                        </div>
+                    {% endif %}
+                    <label for="id_username">Usuário</label>
+                    <input type="text" name="username" id="id_username" required>
+                    <label for="id_password">Senha</label>
+                    <input type="password" name="password" id="id_password" required>
+                    <!-- Botão "Entrar" -->
+                    <div>
+                        <button type="submit" class="submit status-defaultenter-default-1" id="submitButton">
+                            <img src="{% static 'PELFCRED/entrar/Status=Defaultenter-default.png' %}" alt="Botão Entrar" id="enterButtonImage">
+                        </button>
+                    </div>
+                </form>
+
+            </div>
+        </div>
+
+
+        <!-- Logo PELFCRED_APP -->
+        <img src="{% static 'PELFCRED/PELFCRED.png' %}" alt="PELFCRED" class="pelfcred-logo">
+    </div>
+</body>
+</html>

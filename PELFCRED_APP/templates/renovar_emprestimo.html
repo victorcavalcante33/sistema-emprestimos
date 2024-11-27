@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+{% load custom_filters %}
+{% block title %}Renovar Empréstimo{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-12 col-md-8 col-lg-6">
+            <h2 class="mb-4 text-primary text-center">Renovar Empréstimo</h2>
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-sm-6">
+                            <p><strong class="mb-4 text-primary text-center">Cliente:</strong> {{ emprestimo.cliente.nome }}
+                        </div>
+                        <div class="col-sm-6">
+                            <p><strong class="mb-4 text-primary text-center">Saldo:</strong> R$ {{ saldo_devedor|floatformat:2 }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <form method="post" class="mt-4">
+                {% csrf_token %}
+
+                <div class="form-group mb-3">
+                    <label for="nova_taxa_juros" class="form-label">Taxa de Juros (%):</label>
+                    <input type="number" step="0.01" id="nova_taxa_juros" name="nova_taxa_juros" value="{{ emprestimo.taxa_juros }}" required class="form-control">
+                </div>
+                <div class="form-group mb-3">
+                    <label for="capital_adicional" class="form-label">Saída (R$):</label>
+                    <input type="number" step="0.01" id="capital_adicional" name="capital_adicional" class="form-control" value="0">
+                </div>
+                <div class="form-group mb-3">
+                    <label for="parcelas" class="form-label">Número de Parcelas:</label>
+                    <input type="number" id="parcelas" name="parcelas" required class="form-control" value="{{ emprestimo.numero_parcelas }}">
+                </div>
+                <div class="form-group mb-3">
+                    <label for="frequencia" class="form-label">Frequência:</label>
+                    <select id="frequencia" name="frequencia" class="form-select">
+                        <option value="diaria" {% if emprestimo.frequencia == 'diaria' %}selected{% endif %}>Diária</option>
+                        <option value="semanal" {% if emprestimo.frequencia == 'semanal' %}selected{% endif %}>Semanal</option>
+                        <option value="quinzenal" {% if emprestimo.frequencia == 'quinzenal' %}selected{% endif %}>Quinzenal</option>
+                        <option value="mensal" {% if emprestimo.frequencia == 'mensal' %}selected{% endif %}>Mensal</option>
+                    </select>
+                </div>
+                <div class="form-group mb-3" id="dias_semana_div" style="display: none;">
+                    <label for="dias_semana" class="form-label">Semana:</label>
+                    <select id="dias_semana" name="dias_semana" class="form-select">
+                        <option value="seg" {% if 'Segunda-feira' in emprestimo.get_dias_semana_display %}selected{% endif %}>Segunda</option>
+                        <option value="ter" {% if 'Terça-feira' in emprestimo.get_dias_semana_display %}selected{% endif %}>Terça</option>
+                        <option value="qua" {% if 'Quarta-feira' in emprestimo.get_dias_semana_display %}selected{% endif %}>Quarta</option>
+                        <option value="qui" {% if 'Quinta-feira' in emprestimo.get_dias_semana_display %}selected{% endif %}>Quinta</option>
+                        <option value="sex" {% if 'Sexta-feira' in emprestimo.get_dias_semana_display %}selected{% endif %}>Sexta</option>
+                        <option value="sab" {% if 'Sábado' in emprestimo.get_dias_semana_display %}selected{% endif %}>Sábado</option>
+                    </select>
+                </div>
+                
+                <div class="form-group mb-4">
+                    <label for="novoSaldo" class="form-label">Novo Saldo (R$): </label>   
+                    <input type="text" id="novoSaldo" name="novoSaldo" class="form-control" readonly>
+                </div>
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-primary btn-lg">Renovar Empréstimo</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal para mensagens -->
+    <div class="modal fade" id="messageModal" tabindex="-1" aria-labelledby="messageModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="messageModalLabel">Mensagem</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="modalMessage"></div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} mt-2">
+            {{ message }}
+        </div>
+    {% endfor %}
+{% endif %}
+
+
+    <script>
+        const novaTaxaInput = document.getElementById('nova_taxa_juros');
+        const capitalAdicionalInput = document.getElementById('capital_adicional');
+        const novoSaldoDisplay = document.getElementById('novoSaldo');
+        const frequenciaSelect = document.getElementById('frequencia');
+        const diasSemanaDiv = document.getElementById('dias_semana_div');
+        const saldoDevedorAtual = parseFloat("{{ saldo_devedor }}");
+
+        document.addEventListener('DOMContentLoaded', function() {
+            {% if messages %}
+                const messageModal = new bootstrap.Modal(document.getElementById('messageModal'));
+                const modalMessage = document.getElementById('modalMessage');
+                {% for message in messages %}
+                    modalMessage.innerHTML = "{{ message|escapejs }}";
+                    modalMessage.className = 'alert alert-{{ message.tags }}';
+                    messageModal.show();
+                {% endfor %}
+            {% endif %}
+        });
+
+        function toggleDiasSemana() {
+            if (frequenciaSelect.value === 'semanal') {
+                diasSemanaDiv.style.display = 'block';
+            } else {
+                diasSemanaDiv.style.display = 'none';
+            }
+        }
+    
+        function calcularNovoSaldo() {
+            const novaTaxa = parseFloat(novaTaxaInput.value) || 0;
+            const capitalAdicional = parseFloat(capitalAdicionalInput.value) || 0;
+            const novoSaldo = (saldoDevedorAtual + capitalAdicional) * (1 + (novaTaxa / 100));
+            novoSaldoDisplay.value = 'R$ ' + novoSaldo.toFixed(2);
+        }
+    
+        novaTaxaInput.addEventListener('input', calcularNovoSaldo);
+        capitalAdicionalInput.addEventListener('input', calcularNovoSaldo);
+        frequenciaSelect.addEventListener('change', toggleDiasSemana);
+
+        toggleDiasSemana();
+        calcularNovoSaldo();
+    </script>
+</div>
+{% endblock %}

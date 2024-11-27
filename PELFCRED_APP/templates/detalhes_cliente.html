@@ -1,0 +1,229 @@
+{% extends 'base.html' %}
+
+{% block title %}Detalhes do Cliente{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2 class="mb-4 text-primary text-center">{{ cliente.apelido|default:"Não informado" }}</h2>
+    
+    <!-- Botões de Filtragem -->
+    <div class="row mb-4 justify-content-center">
+        <div class="col-md-8 text-center">
+            <a href="{% url 'PELFCRED_APP:detalhes_cliente' cliente.cpf %}?status=ativos" 
+               class="btn btn-primary {% if status_filter == 'ativos' %}active{% endif %}">
+                Ativos
+            </a>
+            <a href="{% url 'PELFCRED_APP:detalhes_cliente' cliente.cpf %}?status=finalizado" 
+               class="btn btn-secondary {% if status_filter == 'finalizado' %}active{% endif %}">
+                Finalizados
+            </a>
+            <a href="{% url 'PELFCRED_APP:detalhes_cliente' cliente.cpf %}?status=inadimplentes" 
+               class="btn btn-danger {% if status_filter == 'inadimplentes' %}active{% endif %}">
+                Inadimplentes
+            </a>
+            <a href="{% url 'PELFCRED_APP:detalhes_cliente' cliente.cpf %}?status=todos" 
+               class="btn btn-info {% if status_filter == 'todos' %}active{% endif %}">
+                Todos
+            </a>
+        </div>
+    </div>
+    
+    <!-- Informações do Cliente -->
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header text-center">
+                    <button class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#infoCliente" aria-expanded="false" aria-controls="infoCliente">
+                        Mostrar/Esconder Cliente
+                    </button>
+                </div>
+                <div class="collapse" id="infoCliente">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 col-sm-12 mb-3">
+                                <p class="mb-2"><strong>Nome:</strong> {{ cliente.nome|default:"" }}</p>
+                                <p class="mb-2"><strong>CPF:</strong> {{ cliente.cpf|default:"" }}</p>
+                                <p class="mb-2"><strong>Outro Doc.:</strong> {{ cliente.documento|default:"" }}</p>
+                                <p class="mb-2"><strong>CNPJ:</strong> {{ cliente.cnpj|default:"" }}</p>
+                                <p class="mb-2"><strong>Telefone:</strong> {{ cliente.telefone|default:"" }}</p>
+                                <p class="mb-2"><strong>Telefone 2:</strong> {{ cliente.telefone2|default:"" }}</p>
+                                <p class="mb-2"><strong>Telefone 2 Vinculo:</strong> {{ cliente.vinculo_telefone2|default:"" }}</p>
+                                <p class="mb-2"><strong>E-mail:</strong> {{ cliente.email|default:"" }}</p>
+                            </div>
+                            <div class="col-md-6 col-sm-12 mb-3">
+                                <p class="mb-2"><strong>Endereço:</strong> {{ cliente.endereco|default:"" }}</p>
+                                <p class="mb-2"><strong>Numero:</strong> {{ cliente.numero_endereco|default:"" }}</p>
+                                <p class="mb-2"><strong>CEP:</strong> {{ cliente.cep|default:"" }}</p>
+                                <p class="mb-2"><strong>Bairro:</strong> {{ cliente.bairro|default:"" }}</p>
+                                <p class="mb-2"><strong>Complemento:</strong> {{ cliente.complemento|default:"" }}</p>
+                                <p class="mb-2"><strong>UF:</strong> {{ cliente.uf|default:"" }}</p>
+                                <p class="mb-2"><strong>Cidade:</strong> {{ cliente.cidade|default:"" }}</p>
+                                <p class="mb-2"><strong>Grupo</strong> {{ cliente.grupo.name|default:"" }}</p>
+                            </div>
+                            <div class="col-12 text-center">
+                                <p class="mb"><strong>Registro:</strong> {{ cliente.data_registro|date:"d/m/Y H:i" }}</p>
+                                <p class="mb-2">
+                                    
+                                    <strong>Status:</strong>
+                                    <span class="status-dot {% if not cliente.bloqueado %}status-dot-active{% else %}status-dot-inactive{% endif %}"></span>
+                                    {% if not cliente.bloqueado %}Ativo{% else %}Inativo{% endif %}
+                                </p>
+                                
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Carousel de Empréstimos -->
+    <div class="row justify-content-center">
+        <div class="col-12 col-md-10 col-lg-8">
+            <div class="card mb-4">
+                <div class="card-body">
+                    {% if emprestimos %}
+                        <div id="carouselContratos" class="carousel slide" data-bs-ride="carousel" data-bs-touch="true">
+                            <div class="carousel-inner">
+                                {% for emprestimo in emprestimos %}
+                                    <div class="carousel-item {% if forloop.first %}active{% endif %}">
+                                        <div class="card">
+                                            <div class="card-body">
+                                                <h5 class="mb-1 text-center">Contrato: {{ emprestimo.id }}</h5>
+                                                <p class="text-muted mb-1 text-center">{{ forloop.counter }} de {{ emprestimos|length }}</p>
+                                                <div class="row justify-content-center">
+                                                    <div class="col-10 col-sm-6 col-md-6 col-lg-4">
+                                                        <div class="d-flex flex-column align-items-center">
+                                                            <p class="mb-2 contract-info text-center"><strong>Capital:</strong> R$ {{ emprestimo.capital|floatformat:2 }}</p>
+                                                            <p class="mb-2 contract-info text-center"><strong>Taxa:</strong> {{ emprestimo.taxa_juros|floatformat:2 }}%</p>
+                                                            <p class="mb-2 contract-info text-center"><strong>Juros:</strong> R$ {{ emprestimo.calcular_valor_juros|floatformat:2 }}</p>
+                                                            <p class="mb-2 contract-info text-center"><strong>Parcela/Valor:</strong> {{ emprestimo.parcelas_info }}</p>
+                                                            <p class="mb-2 contract-info text-center"><strong>Total:</strong> R$ {{ emprestimo.valor_total|floatformat:2 }}</p>
+                                                            <p class="mb-3 contract-info text-center"><strong>Total Pago:</strong> R$ {{ emprestimo.total_pago|floatformat:2 }}</p>
+                                                            <p class="mb-2 contract-info text-center"><strong>Saldo:</strong> R$ {{ emprestimo.saldo_devedor|floatformat:2 }}</p>
+                                                            <p class="mb-2 contract-info text-center"><strong>Frequência:</strong> {{ emprestimo.frequencia|capfirst|default:"" }}</p>
+                                                            <p class="mb-2 contract-info text-center"><strong>Semana:</strong> {{ emprestimo.get_dias_semana_display|join:", " }}</p>
+                                                            <p class="mb-2 contract-info text-center"><strong>Registro:</strong> {{ emprestimo.data_inicio|date:"d/m/Y" }}</p>
+                                                            <p class="mb-2 contract-info text-center"><strong>Vencimento:</strong> {{ emprestimo.data_vencimento|date:"d/m/Y" }}</p>
+                                                            <p class="mb-2 contract-info text-center"><strong>Renovação:</strong> {{ emprestimo.data_renovacao|date:"d/m/Y H:i" | default:"Não" }}</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="row justify-content-center mt-3">
+                                                    <div class="col-12">
+                                                        <p class="mb-3 contract-info text-center">
+                                                            <strong>Status:</strong> 
+                                                            <span {% if emprestimo.status == 'finalizado' or emprestimo.status == 'inadimplentes' %}style="color: red;"{% endif %}>
+                                                                {% if emprestimo.status == 'R' %}
+                                                                    Renovado
+                                                                {% elif emprestimo.status == 'NG' %}
+                                                                    Negociado
+                                                                {% elif emprestimo.status == 'inadimplentes' %}
+                                                                    Inadimplente
+                                                                {% else %}
+                                                                    {{ emprestimo.get_status_display|default:"" }}
+                                                                {% endif %}
+                                                            </span>
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <!-- Controles do Carousel -->
+                                                <div class="d-flex justify-content-center mb-3">
+                                                    <button class="btn btn-sm btn-primary rounded-circle mx-2" type="button" data-bs-target="#carouselContratos" data-bs-slide="prev">
+                                                        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                                                        <span class="visually-hidden">Anterior</span>
+                                                    </button>
+                                                    <button class="btn btn-sm btn-primary rounded-circle mx-2" type="button" data-bs-target="#carouselContratos" data-bs-slide="next">
+                                                        <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                                                        <span class="visually-hidden">Próximo</span>
+                                                    </button>
+                                                </div>
+                                                <!-- Ações do Empréstimo -->
+                                                <div class="dropdown d-flex flex-wrap justify-content-center mt-3">
+                                                    <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" id="dropdownMenuButton{{ emprestimo.id }}" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                                        Ações
+                                                    </button>
+                                                    <ul class="dropdown-menu dropdown-menu-sm" aria-labelledby="dropdownMenuButton{{ emprestimo.id }}">
+                                                        {% if emprestimo.status != 'finalizado' %}
+                                                            {% if emprestimo.status != 'inadimplentes' %}
+                                                                <li><a class="dropdown-item" href="{% url 'PELFCRED_APP:renovar_emprestimo' emprestimo.id %}">Renovar</a></li>
+                                                                <!-- Formulário para marcar o empréstimo como inadimplente -->                               
+                                                                <form method="POST" action="{% url 'PELFCRED_APP:marcar_inadimplente' emprestimo.id %}">
+                                                                    {% csrf_token %}
+                                                                    <button type="submit" class="dropdown-item btn btn-link">Inadimplente</button>
+                                                                </form>
+                                                            {% endif %}
+                                                            <li><a class="dropdown-item" href="{% url 'PELFCRED_APP:registrar_pagamento' emprestimo.id %}">Pagamento</a></li>
+                                                        {% endif %}
+                                                        <li><a class="dropdown-item" href="{% url 'PELFCRED_APP:historico_pagamentos' emprestimo.id %}">Histórico</a></li>
+                                                        <li><a class="dropdown-item" href="{% url 'PELFCRED_APP:editar_emprestimo' emprestimo.id %}">Editar</a></li>
+                                                    </ul>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="alert alert-info text-center" role="alert">
+                            Este cliente não possui contratos no momento.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .carousel-item {
+            height: auto;
+            touch-action: pan-y;
+        }
+        .carousel-item .card {
+            height: auto;
+            min-height: 100%;
+        }
+        .carousel-inner {
+            overflow-y: visible;
+        }
+        .carousel-control-prev-icon,
+        .carousel-control-next-icon {
+            filter: invert(1) grayscale(100%) brightness(100%) sepia(100%) hue-rotate(140deg) saturate(900%) contrast(0.8);
+        }
+        .btn-sm.btn-primary.rounded-circle {
+            width: 30px;
+            height: 30px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .btn-sm.btn-primary.rounded-circle .carousel-control-prev-icon,
+        .btn-sm.btn-primary.rounded-circle .carousel-control-next-icon {
+            width: 15px;
+            height: 15px;
+        }
+    </style>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var carousel = document.querySelector('#carouselContratos');
+            if (typeof Hammer !== 'undefined') {
+                var hammer = new Hammer(carousel);
+                hammer.on('swipeleft', function() {
+                    bootstrap.Carousel.getInstance(carousel).next();
+                });
+                hammer.on('swiperight', function() {
+                    bootstrap.Carousel.getInstance(carousel).prev();
+                });
+            } else {
+                console.warn('Hammer.js is not loaded. Swipe gestures will not be available.');
+            }
+        });
+    </script>
+{% endblock %}

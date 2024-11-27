@@ -175,3 +175,5 @@ cython_debug/
 #.idea/
 
 debug.log
+
+.env

@@ -1,0 +1,265 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load custom_filters %}
+
+{% block title %}Editar Cliente{% endblock %}
+
+{% block content %}
+<link rel="icon" type="image/x-icon" href="{% static 'PELFCRED_APP\favicon/favicon.ico' %}">
+<body class='bg-light'>
+    <div class="row justify-content-center">
+        <div class="col-md-1 col-lg-7">
+            <div class="card shadow">
+                <div class="card-body">
+                    <h4 class="mb-1 text-primary text-center">Editar Cliente</h4>
+                    <form method="post" class="mb-1">
+                        {% csrf_token %}
+                        <div class="row">
+                            <!-- Campo Nome -->
+                            <div class="col-12 col-md-6">
+                                <div class="form-group">
+                                    <input type="text" name="{{ form.nome.name }}" id="{{ form.nome.auto_id }}" class="form-control{% if form.nome.errors %} is-invalid{% endif %}" value="{{ form.nome.value|default_if_none:'' }}" placeholder='Nome'>
+                                    {% if form.nome.errors %}
+                                    <div class="error-message text-danger">{{ form.nome.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <!-- Campo Apelido -->
+                            <div class="col-12 col-md-6">
+                                <div class="form-group">
+                                    <input type="text" name="{{ form.apelido.name }}" id="{{ form.apelido.auto_id }}" class="form-control{% if form.apelido.errors %} is-invalid{% endif %}" value="{{ form.apelido.value|default_if_none:'' }}" placeholder="Apelido">
+                                    {% if form.apelido.errors %}
+                                    <div class="error-message text-danger">{{ form.apelido.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <!-- Campo CPF -->
+                            <div class="col-12 col-md-6">
+                                <div class="form-group">
+                                    <input type="text" name="{{ form.cpf.name }}" id="{{ form.cpf.auto_id }}" class="form-control{% if form.cpf.errors %} is-invalid{% endif %}" maxlength="11" value="{{ form.cpf.value|default_if_none:'' }}" oninput="this.value = this.value.replace(/[^0-9]/g, '')" placeholder="CPF" readonly>
+                                    {% if form.cpf.errors %}
+                                    <div class="error-message text-danger">{{ form.cpf.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <!-- Campo CNPJ -->
+                            <div class="col-12 col-md-6">
+                                <div class="form-group">
+                                    <input type="text" name="{{ form.cnpj.name }}" id="{{ form.cnpj.auto_id }}" class="form-control{% if form.cnpj.errors %} is-invalid{% endif %}" maxlength="14" value="{{ form.cnpj.value|default_if_none:'' }}" oninput="this.value = this.value.replace(/[^0-9]/g, '')" placeholder="CNPJ">
+                                    {% if form.cnpj.errors %}
+                                    <div class="error-message">{{ form.cnpj.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="form-group">
+                                    <input type="text" class="form-control" name="{{ form.documento.name }}" id="{{ form.documento.auto_id }}" value="{{ form.documento.value|default_if_none:'' }}" oninput="this.value = this.value.replace(/[^0-9]/g, '')" placeholder="Documento">
+                                    {% if form.documento.errors %}
+                                    <div class="error-message">{{ form.documento.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="form-group">
+                                     <input type="text" class="form-control" placeholder="Email" name="{{ form.email.name }}" id="{{ form.email.auto_id }}" value="{{ form.email.value|default_if_none:'' }}">
+                                    {% if form.email.errors %}
+                                    <div class="error-message">{{ form.email.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="form-group">
+                                     <input type="text" class="form-control" placeholder="Telefone" name="{{ form.telefone.name }}" id="{{ form.telefone.auto_id }}" maxlength="11" value="{{ form.telefone.value|default_if_none:'' }}">
+                                    {% if form.telefone.errors %}
+                                    <div class="error-message">{{ form.telefone.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="form-group">
+                                     <input type="text" class="form-control" placeholder="Telefone 2" name="{{ form.telefone2.name }}" id="{{ form.telefone2.auto_id }}" maxlength="11" value="{{ form.telefone2.value|default_if_none:'' }}">
+                                    {% if form.telefone2.errors %}
+                                    <div class="error-message">{{ form.telefone2.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="form-group">
+                                     <input type="text" class="form-control" placeholder="Vinculo" name="{{ form.vinculo_telefone2.name }}" id="{{ form.vinculo_telefone2.auto_id }}" value="{{ form.vinculo_telefone2.value|default_if_none:'' }}">
+                                    {% if form.vinculo_telefone2.errors %}
+                                    <div class="error-message">{{ form.vinculo_telefone2.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="form-group">
+                                     <input type="text" class="form-control" placeholder="CEP" name="{{ form.cep.name }}" id="{{ form.cep.auto_id }}" maxlength="8" value="{{ form.cep.value|default_if_none:'' }}" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                                    {% if form.cep.errors %}
+                                    <div class="error-message">{{ form.cep.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="form-group">
+                                     <input type="text" class="form-control" placeholder="Endereço" name="{{ form.endereco.name }}" id="{{ form.endereco.auto_id }}" value="{{ form.endereco.value|default_if_none:'' }}">
+                                    {% if form.endereco.errors %}
+                                    <div class="error-message">{{ form.endereco.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="form-group">
+                                     <input type="text" class="form-control" placeholder="Numero" name="{{ form.numero_endereco.name }}" id="{{ form.numero_endereco.auto_id }}" value="{{ form.numero_endereco.value|default_if_none:'' }}">
+                                    {% if form.numero_endereco.errors %}
+                                    <div class="error-message">{{ form.numero_endereco.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="form-group">
+                                     <input type="text" class="form-control" placeholder="UF" name="{{ form.uf.name }}" id="{{ form.uf.auto_id }}" value="{{ form.uf.value|default_if_none:'' }}">
+                                    {% if form.uf.errors %}
+                                    <div class="error-message">{{ form.uf.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="form-group">
+                                     <input type="text" class="form-control" placeholder="Cidade" name="{{ form.cidade.name }}" id="{{ form.cidade.auto_id }}" value="{{ form.cidade.value|default_if_none:'' }}">
+                                    {% if form.cidade.errors %}
+                                    <div class="error-message">{{ form.cidade.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="form-group">
+                                     <input type="text" class="form-control" placeholder="Bairro" name="{{ form.bairro.name }}" id="{{ form.bairro.auto_id }}" value="{{ form.bairro.value|default_if_none:'' }}">
+                                    {% if form.bairro.errors %}
+                                    <div class="error-message">{{ form.bairro.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="form-group">
+                                     <input type="text" class="form-control" placeholder="Complemento" name="{{ form.complemento.name }}" id="{{ form.complemento.auto_id }}" value="{{ form.complemento.value|default_if_none:'' }}">
+                                    {% if form.complemento.errors %}
+                                    <div class="error-message">{{ form.complemento.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="row">
+                                <!-- Campo Usuário (somente admins podem ver) -->
+                                <div class="col-12 col-md-6">
+                                    <div class="form-group">
+                                        {{ form.usuario.label_tag }}
+                                        {{ form.usuario|add_class:'form-control' }}
+                                        {% if form.usuario.errors %}
+                                        <div class="error-message text-danger">{{ form.usuario.errors }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <!-- Campo Grupo (somente admins podem ver) -->
+                                <div class="col-12 col-md-6">
+                                    <div class="form-group">
+                                        {{ form.grupo.label_tag }}
+                                        {{ form.grupo|add_class:'form-control' }}
+                                        {% if form.grupo.errors %}
+                                        <div class="error-message text-danger">{{ form.grupo.errors }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group mt-3 text-center">
+                            <button type="submit" class="btn btn-primary">Salvar Alterações</button>
+                            <a href="{% url 'PELFCRED_APP:lista_clientes' %}" class="btn btn-secondary">Cancelar</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const cepInput = document.getElementById('id_cep');
+    const vinculoSelect = document.getElementById('id_vinculo_telefone2');
+
+    cepInput.addEventListener('blur', function() {
+        const cep = this.value.replace(/\D/g, '');
+        if (cep.length === 8) {
+            fetch(`https://viacep.com.br/ws/${cep}/json/`)
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.erro) {
+                        document.getElementById('id_endereco').value = data.logradouro || "";
+                        document.getElementById('id_bairro').value = data.bairro || "";
+                        document.getElementById('id_cidade').value = data.localidade || "";
+                        document.getElementById('id_uf').value = data.uf || "";
+                    } else {
+                        alert("CEP não encontrado.");
+                    }
+                })
+                .catch(error => console.error("Erro ao buscar CEP:", error));
+        }
+    });
+
+    vinculoSelect.addEventListener('change', function() {
+        const vinculoOutro = document.getElementById('id_vinculo_outro');
+        vinculoOutro.style.display = this.value === 'Outro' ? 'block' : 'none';
+        if (this.value !== 'Outro') vinculoOutro.value = '';
+    });
+});
+</script>
+{% if request.user.is_superuser %}
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        function updateUsuarios() {
+            var grupoSelect = document.getElementById('id_grupo');
+            var usuarioSelect = document.getElementById('id_usuario');
+            var grupoId = grupoSelect.value;
+
+            // Limpar as opções atuais do usuário
+            usuarioSelect.options.length = 0;
+
+            if (grupoId) {
+                fetch("{% url 'PELFCRED_APP:ajax_load_usuarios' %}?grupo_id=" + grupoId)
+                .then(response => response.json())
+                .then(data => {
+                    var usuarios = data.usuarios;
+
+                    // Adiciona a opção vazia
+                    var optionEmpty = document.createElement('option');
+                    optionEmpty.value = "";
+                    optionEmpty.text = "Selecione um usuário";
+                    usuarioSelect.add(optionEmpty);
+
+                    usuarios.forEach(function(usuario) {
+                        var option = document.createElement('option');
+                        option.value = usuario.id;
+                        option.text = usuario.username;
+                        usuarioSelect.add(option);
+                    });
+                });
+            } else {
+                // Se nenhum grupo foi selecionado
+                var optionEmpty = document.createElement('option');
+                optionEmpty.value = "";
+                optionEmpty.text = "Selecione um grupo primeiro";
+                usuarioSelect.add(optionEmpty);
+            }
+        }
+
+        // Listener para o campo grupo
+        var grupoSelect = document.getElementById('id_grupo');
+        grupoSelect.addEventListener('change', updateUsuarios);
+
+        // Atualizar usuários ao carregar a página, se um grupo já estiver selecionado
+        if (grupoSelect.value) {
+            updateUsuarios();
+        }
+    });
+</script>
+{% endif %}
+
+{% endblock %}

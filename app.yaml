@@ -1,0 +1,18 @@
+runtime: python312  # Certifique-se de que a versão do Python está correta
+
+entrypoint: bash -c "python manage.py migrate && gunicorn -b :$PORT PELFCRED.wsgi"
+env_variables:
+  SECRET_KEY: SECRET_KEY=django-inseguro-27g&wn&vru!2==ms!=1c2kjycjl^*l(bns0(@*&km0yij*-q6k
+  DEBUG: 'False'  # Certifique-se de que o DEBUG está definido como False em produção
+  DB_HOST: 'potent-plasma-441522-u7:southamerica-east1:pelf-sql33'
+  DB_USER: 'victor'
+  DB_PASSWORD: '74694821VVii.'
+  DB_NAME: 'pelfcred'
+  INSTANCE_CONNECTION_NAME: 'potent-plasma-441522-u7:southamerica-east1:pelf-sql33'
+
+handlers:
+  - url: /static
+    static_dir: static/
+
+  - url: /.*
+    script: auto
